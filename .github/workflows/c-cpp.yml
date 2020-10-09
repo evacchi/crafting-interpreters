@@ -13,7 +13,5 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: cd-clox
-      run: cd clox
     - name: make
-      run: make
+      run: cd clox && make
