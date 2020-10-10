@@ -22,11 +22,22 @@ void freeTable(Table* table) {
 static Entry* findEntry(Entry* entries, int capacity,
                         ObjString* key) {
   uint32_t index = key->hash % capacity;
+  Entry* tombstone = NULL;
+
   for (;;) {
     Entry* entry = &entries[index];
 
-    if (entry->key == key || entry->key == NULL) {
-      return entry;
+    if (entry->key == NULL) {
+      if (IS_NIL(entry->value)) {
+        // Empty entry.
+        return tombstone != NULL ? tombstone : entry;
+      } else {
+        // We found a tombstone;
+        if (tombstone == NULL) tombstone = entry;
+      }
+    } else if (entry->key == key) {
+        // We found the key.
+        return entry;
     }
 
     index = (index + 1) % capacity;
@@ -42,6 +53,7 @@ static void adjustCapacity(Table* table, int capacity) {
 
   // recalculate the buckets for each of the existing entries
   // (rebuild the table from scratch by re-inserting)
+  table->count = 0;
   for (int i = 0; table->capacity; i++) {
     Entry* entry = &table->entries[i];
     if (entry->key == NULL) continue;
@@ -49,6 +61,9 @@ static void adjustCapacity(Table* table, int capacity) {
     Entry* dest = findEntry(entries, capacity, entry->key);
     dest->key = entry->key;
     dest->value = entry->value;
+
+    // increment every time is non-tombstone
+    table->count++;
   }
 
   FREE_ARRAY(Entry, table->entries, table->capacity);
@@ -75,7 +90,7 @@ bool tableSet(Table* table, ObjString* key, Value value) {
   Entry* entry = findEntry(table->entries, table->capacity, key);
 
   bool isNewKey = entry->key == NULL;
-  if (isNewKey) table->count++;
+  if (isNewKey && IS_NIL(entry->value)) table->count++;
 
   entry->key = key;
   entry->value = value;
@@ -90,7 +105,7 @@ bool tableDelete(Table* table, ObjString* key) {
   if (entry->key == NULL) return false;
   
   // Place a tombstone in the entry.
-  entry->key == NULL;
+  entry->key = NULL;
   entry->value = BOOL_VAL(true);
 
   return true;
