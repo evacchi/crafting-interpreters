@@ -50,7 +50,8 @@ typedef enum {
   TYPE_SCRIPT
 } FunctionType;
 
-typedef struct {
+typedef struct Compiler {
+  struct Compiler* enclosing;
   ObjFunction* function;
   FunctionType type;
 
@@ -182,6 +183,7 @@ static void patchJump(int offset) {
 }
 
 static void initCompiler(Compiler* compiler, FunctionType type) {
+  compiler->enclosing = current;
   compiler->function = NULL;
   compiler->type = type;
   compiler->localCount = 0;
@@ -209,6 +211,7 @@ static ObjFunction* endCompiler() {
   }
 #endif
 
+  current = current->enclosing;
   return function;
 }
 
@@ -302,6 +305,8 @@ static uint8_t parseVariable(const char* errorMessage) {
 }
 
 static void markInitialized() {
+  // at scopeDepth == 0 it is a global, thus return
+  if (current->scopeDepth == 0) return;
   current->locals[current->localCount - 1].depth =
       current->scopeDepth;
 }
@@ -508,6 +513,37 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '} after a block.");
 }
 
+static void function(FunctionType type) {
+  Compiler compiler;
+  // set this compiler as current
+  initCompiler(&compiler, type);
+  beginScope();
+
+  // Compile the parameter list.
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
+
+  // The body.
+  consume(TOKEN_LEFT_BRACE, "Expect '{' before function body.");
+  block();
+
+  // Create the function object.
+  // we do not end the scope as we end compiler completely
+  ObjFunction* function = endCompiler();
+  emitBytes(OP_CONSTANT, makeConstant(OBJ_VAL(function)));
+}
+
+static void funDeclaration() {
+  // a function declaration simply creates 
+  // and stores one in a newly-declared variable
+  uint8_t global = parseVariable("Expect function name.");
+  // mark initialized immediately 
+  // (a function may refer to itself safely)
+  markInitialized();
+  function(TYPE_FUNCTION);
+  defineVariable(global);
+}
+
 static void varDeclaration() {
   uint8_t global = parseVariable("Expect variable name.");
 
@@ -654,7 +690,9 @@ static void synchronize() {
 }
 
 static void declaration() {
-  if (match(TOKEN_VAR)) {
+  if (match(TOKEN_FUN)) {
+    funDeclaration();
+  } else if (match(TOKEN_VAR)) {
     varDeclaration();
   } else {
     statement();
