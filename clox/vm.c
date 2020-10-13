@@ -277,8 +277,6 @@ static InterpretResult run() {
       }
 
       case OP_CALL: {
-          printf("\nHHHH");
-
         int argCount = READ_BYTE();
         if (!callValue(peek(argCount), argCount)) {
           return INTERPRET_RUNTIME_ERROR;
@@ -288,8 +286,19 @@ static InterpretResult run() {
       }
 
       case OP_RETURN: {
-        // Exit interpreter.
-        return INTERPRET_OK;
+        Value result = pop();
+        
+        vm.frameCount--;
+        if (vm.frameCount == 0) {
+          pop();
+          return INTERPRET_OK;
+        }
+
+        vm.stackTop = frame->slots;
+        push(result);
+
+        frame = &vm.frames[vm.frameCount - 1];
+        break;
       }
     }
   }
