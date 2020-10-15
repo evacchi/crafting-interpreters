@@ -243,7 +243,7 @@ static void endScope() {
     if (current->locals[current->localCount - 1].isCaptured) {
       emitByte(OP_CLOSE_UPVALUE);
     } else {
-      emitByte(OP_POP),
+      emitByte(OP_POP);
     }
     current->localCount--;
   }
