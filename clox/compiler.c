@@ -302,11 +302,22 @@ static int addUpvalue(Compiler* compiler, uint8_t index,
 }
 
 static int resolveUpvalue(Compiler* compiler, Token* name) {
+  // there is no enclosing function: assume global
   if (compiler->enclosing == NULL) return -1;
 
+  // look for  a local in the enclosing function
   int local = resolveLocal(compiler->enclosing, name);
   if (local != -1) {
     return addUpvalue(compiler, (uint8_t)local, true);
+  }
+
+  // look beyond the immediately enclosing function
+  int upvalue = resolveUpvalue(compiler->enclosing, name);
+  if (upvalue != -1) {
+    // if found, add an upvalue to current, and return its index;
+    // isLocal is false, because it is no longer is a local, 
+    // but an upvalue from the surrounding function
+    return addUpvalue(compiler, (uint8_t)upvalue, false);
   }
 
   return -1;
@@ -616,6 +627,14 @@ static void function(FunctionType type) {
   // we do not end the scope as we end compiler completely
   ObjFunction* function = endCompiler();
   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
+
+  // OP_CLOSURE is variably-sized encoded
+  for (int i = 0; i < function->upvalueCount; i++) {
+    // for each upvalue there is a pair of operands
+    emitByte(compiler.upvalues[i].isLocal ? 1 : 0);
+    emitByte(compiler.upvalues[i].index);
+  }
+  
 }
 
 static void funDeclaration() {
