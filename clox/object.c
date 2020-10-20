@@ -8,7 +8,7 @@
 #include "vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
-    (type*)allocateObject(sizeof(type), objectType);
+    (type*)allocateObject(sizeof(type), objectType)
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
@@ -16,6 +16,7 @@ static Obj* allocateObject(size_t size, ObjType type) {
   object->isMarked = false;
   
   object->next = vm.objects;
+  vm.objects = object; 
 
 #ifdef DEBUG_LOG_GC
   printf("%p allocate %ld for %d\n", (void*)object, size, type);
