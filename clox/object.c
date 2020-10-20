@@ -8,14 +8,15 @@
 #include "vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
-    (type*)allocateObject(sizeof(type), objectType);
+    (type*)allocateObject(sizeof(type), objectType)
 
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
   object->type = type;
   object->isMarked = false;
-  
+
   object->next = vm.objects;
+  vm.objects = object;
 
 #ifdef DEBUG_LOG_GC
   printf("%p allocate %ld for %d\n", (void*)object, size, type);
@@ -23,27 +24,24 @@ static Obj* allocateObject(size_t size, ObjType type) {
 
   return object;
 }
-
 ObjClass* newClass(ObjString* name) {
   ObjClass* klass = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
-  klass->name = name; 
+  klass->name = name; // [klass]
   return klass;
 }
-
 ObjClosure* newClosure(ObjFunction* function) {
-  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, 
+  ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*,
                                    function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) {
     upvalues[i] = NULL;
   }
-  
+
   ObjClosure* closure = ALLOCATE_OBJ(ObjClosure, OBJ_CLOSURE);
   closure->function = function;
   closure->upvalues = upvalues;
   closure->upvalueCount = function->upvalueCount;
   return closure;
 }
-
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
 
@@ -53,14 +51,12 @@ ObjFunction* newFunction() {
   initChunk(&function->chunk);
   return function;
 }
-
 ObjInstance* newInstance(ObjClass* klass) {
   ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
   instance->klass = klass;
   initTable(&instance->fields);
   return instance;
 }
-
 ObjNative* newNative(NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->function = function;
@@ -77,11 +73,9 @@ static ObjString* allocateString(char* chars, int length,
   push(OBJ_VAL(string));
   tableSet(&vm.strings, string, NIL_VAL);
   pop();
-  
+
   return string;
 }
-
-// FNV-1a
 static uint32_t hashString(const char* key, int length) {
   uint32_t hash = 2166136261u;
 
@@ -92,7 +86,6 @@ static uint32_t hashString(const char* key, int length) {
 
   return hash;
 }
-
 ObjString* takeString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = tableFindString(&vm.strings, chars, length,
@@ -101,10 +94,9 @@ ObjString* takeString(char* chars, int length) {
     FREE_ARRAY(char, chars, length + 1);
     return interned;
   }
-  
+
   return allocateString(chars, length, hash);
 }
-
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = tableFindString(&vm.strings, chars, length,
@@ -117,7 +109,6 @@ ObjString* copyString(const char* chars, int length) {
 
   return allocateString(heapChars, length, hash);
 }
-
 ObjUpvalue* newUpvalue(Value* slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
   upvalue->closed = NIL_VAL;
@@ -125,7 +116,6 @@ ObjUpvalue* newUpvalue(Value* slot) {
   upvalue->next = NULL;
   return upvalue;
 }
-
 static void printFunction(ObjFunction* function) {
   if (function->name == NULL) {
     printf("<script>");
@@ -133,7 +123,6 @@ static void printFunction(ObjFunction* function) {
   }
   printf("<fn %s>", function->name->chars);
 }
-
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_CLASS:
