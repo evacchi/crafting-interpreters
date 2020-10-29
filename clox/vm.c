@@ -537,6 +537,11 @@ static InterpretResult run() {
 
       case OP_INHERIT: {
         Value superclass = peek(1);
+        if (!IS_CLASS(superclass)) {
+          runtimeError("Superclass must be a class.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        
         ObjClass* subclass = AS_CLASS(peek(0));
         // copy over all of the inherited methods (overrides will overwrite)
         tableAddAll(&AS_CLASS(superclass)->methods, 
