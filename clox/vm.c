@@ -409,6 +409,15 @@ static InterpretResult run() {
         break;
       }
 
+      case OP_GET_SUPER: {
+        ObjString* name = READ_STRING();
+        ObjClass* superclass = AS_CLASS(pop());
+        if (!bindMethod(superclass, name)) {
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        break;
+      }
+
       case OP_EQUAL: {
         Value a = pop();
         Value b = pop();
@@ -541,7 +550,7 @@ static InterpretResult run() {
           runtimeError("Superclass must be a class.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        
+
         ObjClass* subclass = AS_CLASS(peek(0));
         // copy over all of the inherited methods (overrides will overwrite)
         tableAddAll(&AS_CLASS(superclass)->methods, 
