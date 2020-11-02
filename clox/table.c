@@ -13,12 +13,12 @@ void initTable(Table* table) {
   table->capacity = -1;
   table->entries = NULL;
 }
-
 void freeTable(Table* table) {
   FREE_ARRAY(Entry, table->entries, table->capacity + 1);
   initTable(table);
 }
-
+// NOTE: The "Optimization" chapter has a manual copy of this function.
+// If you change it here, make sure to update that copy.
 static Entry* findEntry(Entry* entries, int capacity,
                         ObjString* key) {
   uint32_t index = key->hash & capacity;
@@ -36,41 +36,13 @@ static Entry* findEntry(Entry* entries, int capacity,
         if (tombstone == NULL) tombstone = entry;
       }
     } else if (entry->key == key) {
-        // We found the key.
-        return entry;
+      // We found the key.
+      return entry;
     }
 
     index = (index + 1) & capacity;
   }
 }
-
-static void adjustCapacity(Table* table, int capacity) {
-  Entry* entries = ALLOCATE(Entry, capacity + 1);
-  for (int i = 0; i <= capacity; i++) {
-    entries[i].key = NULL;
-    entries[i].value = NIL_VAL;
-  }
-
-  // recalculate the buckets for each of the existing entries
-  // (rebuild the table from scratch by re-inserting)
-  table->count = 0;
-  for (int i = 0; i <= table->capacity; i++) {
-    Entry* entry = &table->entries[i];
-    if (entry->key == NULL) continue;
-
-    Entry* dest = findEntry(entries, capacity, entry->key);
-    dest->key = entry->key;
-    dest->value = entry->value;
-
-    // increment every time is non-tombstone
-    table->count++;
-  }
-
-  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
-  table->entries = entries;
-  table->capacity = capacity;
-}
-
 bool tableGet(Table* table, ObjString* key, Value* value) {
   if (table->count == 0) return false;
 
@@ -80,7 +52,28 @@ bool tableGet(Table* table, ObjString* key, Value* value) {
   *value = entry->value;
   return true;
 }
+static void adjustCapacity(Table* table, int capacity) {
+  Entry* entries = ALLOCATE(Entry, capacity + 1);
+  for (int i = 0; i <= capacity; i++) {
+    entries[i].key = NULL;
+    entries[i].value = NIL_VAL;
+  }
 
+  table->count = 0;
+  for (int i = 0; i <= table->capacity; i++) {
+    Entry* entry = &table->entries[i];
+    if (entry->key == NULL) continue;
+
+    Entry* dest = findEntry(entries, capacity, entry->key);
+    dest->key = entry->key;
+    dest->value = entry->value;
+    table->count++;
+  }
+
+  FREE_ARRAY(Entry, table->entries, table->capacity + 1);
+  table->entries = entries;
+  table->capacity = capacity;
+}
 bool tableSet(Table* table, ObjString* key, Value value) {
   if (table->count + 1 > (table->capacity + 1) * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity + 1) - 1;
@@ -96,21 +89,19 @@ bool tableSet(Table* table, ObjString* key, Value value) {
   entry->value = value;
   return isNewKey;
 }
-
 bool tableDelete(Table* table, ObjString* key) {
   if (table->count == 0) return false;
 
- // Find the entry.
- Entry* entry = findEntry(table->entries, table->capacity, key);
+  // Find the entry.
+  Entry* entry = findEntry(table->entries, table->capacity, key);
   if (entry->key == NULL) return false;
-  
+
   // Place a tombstone in the entry.
   entry->key = NULL;
   entry->value = BOOL_VAL(true);
 
   return true;
 }
-
 void tableAddAll(Table* from, Table* to) {
   for (int i = 0; i <= from->capacity; i++) {
     Entry* entry = &from->entries[i];
@@ -119,7 +110,6 @@ void tableAddAll(Table* from, Table* to) {
     }
   }
 }
-
 ObjString* tableFindString(Table* table, const char* chars,
                            int length, uint32_t hash) {
   if (table->count == 0) return NULL;
@@ -142,7 +132,6 @@ ObjString* tableFindString(Table* table, const char* chars,
     index = (index + 1) & table->capacity;
   }
 }
-
 void tableRemoveWhite(Table* table) {
   for (int i = 0; i <= table->capacity; i++) {
     Entry* entry = &table->entries[i];
@@ -150,15 +139,11 @@ void tableRemoveWhite(Table* table) {
       tableDelete(table, entry->key);
     }
   }
-  
 }
-
 void markTable(Table* table) {
   for (int i = 0; i <= table->capacity; i++) {
     Entry* entry = &table->entries[i];
     markObject((Obj*)entry->key);
     markValue(entry->value);
   }
-  
 }
-

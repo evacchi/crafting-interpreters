@@ -34,7 +34,7 @@ typedef enum {
   OBJ_INSTANCE,
   OBJ_NATIVE,
   OBJ_STRING,
-  OBJ_UPVALUE,
+  OBJ_UPVALUE
 } ObjType;
 
 struct sObj {
@@ -64,14 +64,12 @@ struct sObjString {
   char* chars;
   uint32_t hash;
 };
-
 typedef struct ObjUpvalue {
   Obj obj;
   Value* location;
   Value closed;
   struct ObjUpvalue* next;
 } ObjUpvalue;
-
 typedef struct {
   Obj obj;
   ObjFunction* function;
@@ -88,7 +86,7 @@ typedef struct {
 typedef struct {
   Obj obj;
   ObjClass* klass;
-  Table fields; 
+  Table fields; // [fields]
 } ObjInstance;
 
 typedef struct {

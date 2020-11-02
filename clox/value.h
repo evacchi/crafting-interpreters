@@ -54,9 +54,9 @@ static inline Value numToValue(double num) {
 
 typedef enum {
   VAL_BOOL,
-  VAL_NIL, 
+  VAL_NIL, // [user-types]
   VAL_NUMBER,
-  VAL_OBJ,
+  VAL_OBJ
 } ValueType;
 
 typedef struct {
@@ -65,7 +65,7 @@ typedef struct {
     bool boolean;
     double number;
     Obj* obj;
-  } as; 
+  } as; // [as]
 } Value;
 
 #define IS_BOOL(value)    ((value).type == VAL_BOOL)
