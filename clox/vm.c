@@ -85,7 +85,7 @@ static Value peek(int distance) {
 
 static bool call(ObjFunction* function, int argCount) {
   if (argCount != function->arity) {
-    runtimeError("Expected %d arguments but got %d",
+    runtimeError("Expected %d arguments but got %d.",
         function->arity, argCount);
     return false;
   }
