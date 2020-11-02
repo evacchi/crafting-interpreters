@@ -47,7 +47,7 @@ void markObject(Obj* object) {
 
   if (vm.grayCapacity < vm.grayCount + 1) {
     vm.grayCapacity = GROW_CAPACITY(vm.grayCapacity);
-    vm.grayStack = realloc(vm.grayStack, 
+    vm.grayStack = realloc(vm.grayStack,
                            sizeof(Obj*) * vm.grayCapacity);
 
     // allocation failure
@@ -103,7 +103,7 @@ static void blackenObject(Obj* object) {
     case OBJ_FUNCTION: {
       ObjFunction* function = (ObjFunction*)object;
       markObject((Obj*)function->name);
-      markArray(&function->chunk.constants); 
+      markArray(&function->chunk.constants);
       break;
     }
 
@@ -120,7 +120,7 @@ static void blackenObject(Obj* object) {
 
     case OBJ_NATIVE:
     case OBJ_STRING:
-      break;    
+      break;
   }
 }
 
@@ -143,7 +143,7 @@ static void freeObject(Obj* object) {
 
     case OBJ_CLOSURE: {
       ObjClosure* closure = (ObjClosure*)object;
-      FREE_ARRAY(ObjUpvalue*, closure->upvalues, 
+      FREE_ARRAY(ObjUpvalue*, closure->upvalues,
                  closure->upvalueCount);
       // we will need to refcount and gc ObjFunctions
       FREE(ObjClosure, object);
@@ -217,16 +217,16 @@ static void sweep() {
       previous = object;
       object = object->next;
     } else {
-      Obj* unreachead = object;
+      Obj* unreached = object;
 
       object = object->next;
       if (previous != NULL) {
         previous->next = object;
       } else {
-         vm.objects = object;
+        vm.objects = object;
       }
-      
-      freeObject(unreachead);
+
+      freeObject(unreached);
     }
   }
   

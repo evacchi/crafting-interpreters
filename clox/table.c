@@ -36,12 +36,22 @@ static Entry* findEntry(Entry* entries, int capacity,
         if (tombstone == NULL) tombstone = entry;
       }
     } else if (entry->key == key) {
-        // We found the key.
-        return entry;
+      // We found the key.
+      return entry;
     }
 
     index = (index + 1) & capacity;
   }
+}
+
+bool tableGet(Table* table, ObjString* key, Value* value) {
+  if (table->count == 0) return false;
+
+  Entry* entry = findEntry(table->entries, table->capacity, key);
+  if (entry->key == NULL) return false;
+
+  *value = entry->value;
+  return true;
 }
 
 static void adjustCapacity(Table* table, int capacity) {
@@ -71,16 +81,6 @@ static void adjustCapacity(Table* table, int capacity) {
   table->capacity = capacity;
 }
 
-bool tableGet(Table* table, ObjString* key, Value* value) {
-  if (table->count == 0) return false;
-
-  Entry* entry = findEntry(table->entries, table->capacity, key);
-  if (entry->key == NULL) return false;
-
-  *value = entry->value;
-  return true;
-}
-
 bool tableSet(Table* table, ObjString* key, Value value) {
   if (table->count + 1 > (table->capacity + 1) * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity + 1) - 1;
@@ -100,8 +100,8 @@ bool tableSet(Table* table, ObjString* key, Value value) {
 bool tableDelete(Table* table, ObjString* key) {
   if (table->count == 0) return false;
 
- // Find the entry.
- Entry* entry = findEntry(table->entries, table->capacity, key);
+  // Find the entry.
+  Entry* entry = findEntry(table->entries, table->capacity, key);
   if (entry->key == NULL) return false;
   
   // Place a tombstone in the entry.

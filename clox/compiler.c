@@ -76,9 +76,9 @@ typedef struct ClassCompiler {
   bool hasSuperclass;
 } ClassCompiler;
 
-Parser parser;
-
 ClassCompiler* currentClass = NULL;
+
+Parser parser;
 
 // better: each function in the front end 
 // should get a pointer to a Compiler,
@@ -277,8 +277,8 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static u_int8_t identifierConstant(Token* name) {
-  return makeConstant(OBJ_VAL(copyString(name -> start, 
+static uint8_t identifierConstant(Token* name) {
+  return makeConstant(OBJ_VAL(copyString(name->start, 
                                          name->length)));
 }
 
@@ -364,7 +364,7 @@ static void addLocal(Token name) {
 }
 
 static void declareVariable() {
-  // Global variable are implicitly declared.
+  // Global variables are implicitly declared. 
   if (current->scopeDepth == 0) return;
 
   Token* name = &parser.previous;
@@ -466,7 +466,7 @@ static void call(bool canAssign) {
 }
 
 static void dot(bool canAssign) {
-  consume(TOKEN_IDENTIFIER, "Expect property name after'.'.");
+  consume(TOKEN_IDENTIFIER, "Expect property name after '.'."); 
   uint8_t name = identifierConstant(&parser.previous);
 
   if (canAssign && match(TOKEN_EQUAL)) {
@@ -559,7 +559,7 @@ static void super_(bool canAssign) {
   }
 
   consume(TOKEN_DOT, "Expect '.' after 'super'.");
-  consume(TOKEN_IDENTIFIER, "Expect superclass method name");
+  consume(TOKEN_IDENTIFIER, "Expect superclass method name."); 
   uint8_t name = identifierConstant(&parser.previous);
 
   namedVariable(syntheticToken("this"), false);
@@ -676,7 +676,7 @@ static void block() {
     declaration();
   }
 
-  consume(TOKEN_RIGHT_BRACE, "Expect '} after a block.");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after block."); 
 }
 
 static void function(FunctionType type) {
@@ -769,11 +769,11 @@ static void classDeclaration() {
   }
 
   namedVariable(className, false);
-  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body");
+  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body."); 
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     method();
   }
-  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
   emitByte(OP_POP);
 
   if (classCompiler.hasSuperclass) {
@@ -810,7 +810,7 @@ static void varDeclaration() {
 
 static void expressionStatement() {
   expression();
-  consume(TOKEN_SEMICOLON, "Expect ';' after value");
+  consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
   emitByte(OP_POP);
 }
 
@@ -890,7 +890,7 @@ static void ifStatement() {
 
 static void printStatement() {
   expression();
-  consume(TOKEN_SEMICOLON, "Expect ';' after value");
+  consume(TOKEN_SEMICOLON, "Expect ';' after value.");
   emitByte(OP_PRINT);
 }
 
@@ -915,7 +915,7 @@ static void returnStatement() {
 static void whileStatement() {
   int loopStart = currentChunk()->count;
 
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
   expression();
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after condition.");
 
@@ -952,7 +952,7 @@ static void synchronize() {
         ;
     }
 
-  advance();
+    advance();
 
   }
 }
@@ -1001,7 +1001,7 @@ ObjFunction* compile(const char* source) {
 
   advance();
 
-  while(!match(TOKEN_EOF)) {
+  while (!match(TOKEN_EOF)) {
     declaration();
   }
 

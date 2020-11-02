@@ -97,7 +97,7 @@ static Value peek(int distance) {
 
 static bool call(ObjClosure* closure, int argCount) {
   if (argCount != closure->function->arity) {
-    runtimeError("Expected %d arguments but got %d",
+    runtimeError("Expected %d arguments but got %d.",
         closure->function->arity, argCount);
     return false;
   }
@@ -308,9 +308,9 @@ static InterpretResult run() {
     uint8_t instruction;
     switch (instruction = READ_BYTE()) {
       case OP_CONSTANT: {
-          Value constant = READ_CONSTANT();
-          push(constant);
-          break;
+        Value constant = READ_CONSTANT();
+        push(constant);
+        break;
       }
       case OP_NIL:      push(NIL_VAL); break;
       case OP_TRUE:     push(BOOL_VAL(true)); break;
@@ -419,8 +419,8 @@ static InterpretResult run() {
       }
 
       case OP_EQUAL: {
-        Value a = pop();
         Value b = pop();
+        Value a = pop();
         push(BOOL_VAL(valuesEqual(a, b)));
         break;
       }
