@@ -360,7 +360,7 @@ static void synchronize() {
         ;
     }
 
-  advance();
+    advance();
 
   }
 }
