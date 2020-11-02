@@ -434,7 +434,7 @@ static void block() {
     declaration();
   }
 
-  consume(TOKEN_RIGHT_BRACE, "Expect '} after a block.");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after block."); 
 }
 
 static void varDeclaration() {
