@@ -666,8 +666,8 @@ static void classDeclaration() {
   emitBytes(OP_CLASS, nameConstant);
   defineVariable(nameConstant);
 
-  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body");
-  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body");
+  consume(TOKEN_LEFT_BRACE, "Expect '{' before class body.");
+  consume(TOKEN_RIGHT_BRACE, "Expect '}' after class body.");
 }
 
 static void funDeclaration() {
