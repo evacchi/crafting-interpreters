@@ -392,7 +392,7 @@ bool compile(const char* source, Chunk* chunk) {
 
   advance();
 
-  while(!match(TOKEN_EOF)) {
+  while (!match(TOKEN_EOF)) {
     declaration();
   }
 
