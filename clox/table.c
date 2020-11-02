@@ -100,8 +100,8 @@ bool tableSet(Table* table, ObjString* key, Value value) {
 bool tableDelete(Table* table, ObjString* key) {
   if (table->count == 0) return false;
 
- // Find the entry.
- Entry* entry = findEntry(table->entries, table->capacity, key);
+  // Find the entry.
+  Entry* entry = findEntry(table->entries, table->capacity, key);
   if (entry->key == NULL) return false;
   
   // Place a tombstone in the entry.
