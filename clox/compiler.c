@@ -144,8 +144,8 @@ static void declaration();
 static ParseRule* getRule(TokenType type);
 static void parsePrecedence(Precedence precedence);
 
-static u_int8_t identifierConstant(Token* name) {
-  return makeConstant(OBJ_VAL(copyString(name -> start, 
+static uint8_t identifierConstant(Token* name) {
+  return makeConstant(OBJ_VAL(copyString(name->start, 
                                          name->length)));
 }
 
