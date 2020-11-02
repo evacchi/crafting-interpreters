@@ -75,9 +75,9 @@ typedef struct ClassCompiler {
   Token name;
 } ClassCompiler;
 
-Parser parser;
-
 ClassCompiler* currentClass = NULL;
+
+Parser parser;
 
 // better: each function in the front end 
 // should get a pointer to a Compiler,
