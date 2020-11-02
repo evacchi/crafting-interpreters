@@ -223,7 +223,7 @@ static void addLocal(Token name) {
 }
 
 static void declareVariable() {
-  // Global variable are implicitly declared.
+  // Global variables are implicitly declared. 
   if (current->scopeDepth == 0) return;
 
   Token* name = &parser.previous;
