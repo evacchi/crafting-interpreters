@@ -90,8 +90,8 @@ static InterpretResult run() {
       case OP_TRUE:     push(BOOL_VAL(true)); break;
       case OP_FALSE:    push(BOOL_VAL(false)); break;
       case OP_EQUAL: {
-        Value a = pop();
         Value b = pop();
+        Value a = pop();
         push(BOOL_VAL(valuesEqual(a, b)));
         break;
       }
