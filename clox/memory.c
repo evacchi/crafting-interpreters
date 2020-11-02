@@ -177,16 +177,16 @@ static void sweep() {
       previous = object;
       object = object->next;
     } else {
-      Obj* unreachead = object;
+      Obj* unreached = object;
 
       object = object->next;
       if (previous != NULL) {
         previous->next = object;
       } else {
-         vm.objects = object;
+        vm.objects = object;
       }
-      
-      freeObject(unreachead);
+
+      freeObject(unreached);
     }
   }
   
