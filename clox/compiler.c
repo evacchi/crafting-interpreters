@@ -334,7 +334,7 @@ static void expressionStatement() {
 
 static void printStatement() {
   expression();
-  consume(TOKEN_SEMICOLON, "Expect ';' after value");
+  consume(TOKEN_SEMICOLON, "Expect ';' after value.");
   emitByte(OP_PRINT);
 }
 
