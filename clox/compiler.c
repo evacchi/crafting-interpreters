@@ -559,7 +559,7 @@ static void super_(bool canAssign) {
   }
 
   consume(TOKEN_DOT, "Expect '.' after 'super'.");
-  consume(TOKEN_IDENTIFIER, "Expect superclass method name");
+  consume(TOKEN_IDENTIFIER, "Expect superclass method name."); 
   uint8_t name = identifierConstant(&parser.previous);
 
   namedVariable(syntheticToken("this"), false);
