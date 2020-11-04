@@ -1,6 +1,9 @@
+type Value = f64;
+
 #[derive(Debug)]
 enum OpCode {
-    OpReturn,
+    OpConstant { value: Value, line: usize },
+    OpReturn   { line: usize },
 }
 
 struct Chunk {
@@ -21,30 +24,19 @@ impl Chunk {
         }
     }
 
-    fn disassemble_instruction(&self, offset: usize) -> usize{
-        print!("{:04} ", offset);
-    
-        let instruction = &self.code[offset];
-        match instruction {
-          OpCode::OpReturn =>
-            return simple_instruction("OpReturn", offset),
-        }
+    fn disassemble_instruction(&self, offset: usize) {
+        print!("{:04} {:?}\n", offset, &self.code[offset]);
     }
     
 
 }
 
-
-
-fn simple_instruction(name: &str, offset: usize) -> usize {
-    print!("{}\n", name);
-    return offset + 1;
-}
-
 fn main() {
     let mut chunk = Chunk {
-        code : Vec::new()
+        code : Vec::new(),
     };
-    chunk.write(OpCode::OpReturn);
+    chunk.write(OpCode::OpReturn { line: 123 });
+    chunk.write(OpCode:: OpConstant{ value: 1.2, line: 123});
+
     chunk.disassemble("test chunk");
 }
