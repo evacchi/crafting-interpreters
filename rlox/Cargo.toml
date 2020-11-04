@@ -1,0 +1,5 @@
+[package]
+
+name = "rlox"
+version = "0.0.1"
+authors = [ "Edoardo Vacchi <evacchi@live.com>" ]
