@@ -37,11 +37,14 @@ impl VM {
             
             instruction.disassemble(self.ip);
             match instruction {
-                OpCode::OpConstant { value, line } => {
+                OpCode::Constant { value, line } => {
                     self.stack.push(value);
-                    print!("\n")
                 }
-                OpCode::OpReturn { line } => {
+                OpCode::Negate { line } => {
+                    let v = self.stack.pop().unwrap();
+                    self.stack.push(Value( -v.0 ));
+                }
+                OpCode::Return { line } => {
                     self.stack.pop().unwrap().print();
                     print!("\n");
                     return InterpretResult::Ok

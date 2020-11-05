@@ -13,9 +13,10 @@ fn main() {
     let mut vm = VM::new();
     let mut chunk = Chunk::new();
 
-    chunk.write(OpCode::OpReturn { line: 123 });
-    chunk.write(OpCode:: OpConstant{ value: Value(1.2), line: 123});
-
+    chunk.write(OpCode::Constant{ value: Value(1.2), line: 123});
+    chunk.write(OpCode::Negate{ line: 123});
+    chunk.write(OpCode::Return { line: 123 });
+    
     chunk.disassemble("test chunk");
     vm.interpret(chunk);
 }

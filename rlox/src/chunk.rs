@@ -2,8 +2,9 @@ use value::Value;
 
 #[derive(Debug,Copy,Clone)]
 pub enum OpCode {
-    OpConstant { value: Value, line: usize },
-    OpReturn   { line: usize },
+    Constant { value: Value, line: usize },
+    Negate   { line: usize },
+    Return   { line: usize },
 }
 
 impl OpCode {
@@ -28,7 +29,7 @@ impl Chunk {
     }
 
     pub fn fetch(&self, ip: usize) -> OpCode {
-        self.code[self.code.len() - ip - 1]
+        self.code[ip]
     } 
 
     pub fn disassemble(&self, name: &str) {
