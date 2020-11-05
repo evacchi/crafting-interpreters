@@ -1,9 +1,11 @@
 use chunk::Chunk;
 use chunk::OpCode;
+use value::Value;
 
 pub struct VM {
     chunk: Chunk,
-    ip: usize
+    ip: usize,
+    stack: Vec<Value>,
 }
 
 pub enum InterpretResult {
@@ -14,7 +16,7 @@ pub enum InterpretResult {
 
 impl VM {
     pub fn new() -> VM {
-        VM { chunk: Chunk::new(), ip: 0 }
+        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new() }
     }
     pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
         self.chunk = chunk;
@@ -24,14 +26,26 @@ impl VM {
     fn run(&mut self) -> InterpretResult {
         loop {
             let instruction = self.chunk.fetch(self.ip);
+
+            print!("          ");
+            for slot in self.stack.iter() {
+              print!("[ ");
+              slot.print();
+              print!(" ]");
+            }
+            print!("\n");
+            
             instruction.disassemble(self.ip);
             match instruction {
                 OpCode::OpConstant { value, line } => {
-                    value.print();
+                    self.stack.push(value);
                     print!("\n")
                 }
-                OpCode::OpReturn { line } => 
-                    return InterpretResult::Ok,
+                OpCode::OpReturn { line } => {
+                    self.stack.pop().unwrap().print();
+                    print!("\n");
+                    return InterpretResult::Ok
+                }
             }
             self.ip += 1
         }
