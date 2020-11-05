@@ -37,9 +37,30 @@ impl VM {
             
             instruction.disassemble(self.ip);
             match instruction {
-                OpCode::Constant { value, line } => {
+                OpCode::Constant { offset, line } => {
+                    let value = self.chunk.read_constant(offset);
                     self.stack.push(value);
                 }
+                OpCode::Add      { line } => {
+                    let b = self.stack.pop().unwrap().0;
+                    let a = self.stack.pop().unwrap().0;
+                    self.stack.push(Value(a + b))
+                }
+                OpCode::Subtract { line } => {
+                    let b = self.stack.pop().unwrap().0;
+                    let a = self.stack.pop().unwrap().0;
+                    self.stack.push(Value(a - b))
+                }
+                OpCode::Multiply { line } => {
+                    let b = self.stack.pop().unwrap().0;
+                    let a = self.stack.pop().unwrap().0;
+                    self.stack.push(Value(a * b))
+                }
+                OpCode::Divide   { line } => {
+                    let b = self.stack.pop().unwrap().0;
+                    let a = self.stack.pop().unwrap().0;
+                    self.stack.push(Value(a / b))
+                }                
                 OpCode::Negate { line } => {
                     let v = self.stack.pop().unwrap();
                     self.stack.push(Value( -v.0 ));
@@ -53,4 +74,5 @@ impl VM {
             self.ip += 1
         }
     }
+    
 }

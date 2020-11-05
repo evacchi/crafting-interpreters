@@ -13,7 +13,17 @@ fn main() {
     let mut vm = VM::new();
     let mut chunk = Chunk::new();
 
-    chunk.write(OpCode::Constant{ value: Value(1.2), line: 123});
+    let offset = chunk.write_constant(Value(1.2));
+    chunk.write(OpCode::Constant{ offset, line: 123});
+
+    let offset = chunk.write_constant(Value(3.4));
+    chunk.write(OpCode::Constant{ offset, line: 123});
+    chunk.write(OpCode::Add { line: 123 });
+
+    let offset = chunk.write_constant(Value(5.6));
+    chunk.write(OpCode::Constant{ offset, line: 123});
+
+    chunk.write(OpCode::Divide { line: 123 });
     chunk.write(OpCode::Negate{ line: 123});
     chunk.write(OpCode::Return { line: 123 });
     
