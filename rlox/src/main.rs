@@ -7,6 +7,7 @@ mod value;
 use std::env;
 use std::fs;
 use std::io;
+use std::io::Write;
 use std::process;
 
 use chunk::Chunk;
@@ -35,6 +36,7 @@ fn repl(vm: &mut VM) {
     let mut line = String::new();
     loop {
         print!("> ");
+        io::stdout().flush().unwrap();
         io::stdin().read_line(&mut line)
             .expect("error: unable to read user input");
             if (line.is_empty()) {

@@ -1,6 +1,10 @@
+use std::str::Chars;
+use std::vec::IntoIter;
+use std::iter::Peekable;
 
 pub struct Scanner {
     source: String,
+    chars: Peekable<IntoIter<char>>,
     start: usize,
     current: usize,
     line: usize
@@ -43,24 +47,73 @@ pub struct Token {
 impl Scanner {
     pub fn new(source: String) -> Scanner {
         Scanner {
-            source: source,
+            source: source.to_string(),
+            chars: source.chars().collect::<Vec<_>>().into_iter().peekable(),
             start: 0,
             current: 0,
             line: 1
         }
     }
 
-    fn is_at_end(&self) -> bool {
-        self.current == self.source.len()
-      }
+    // mut to make equality happy ?
+    fn matchChar(&mut self, expected: char) -> bool {
+        match self.chars.peek() {
+            None => false,
+            Some(c) => if *c == expected {
+                self.chars.next();
+                true
+            } else {
+                false
+            }
+        }
+    }
 
+
+    // mut to make equality in match happy ?
     pub fn scan(&mut self) -> Token {
         self.start = self.current;
-        if (self.is_at_end()) {
-            return self.make_token(TokenType::TOKEN_EOF);
+        // if self.is_at_end() {
+        //     return self.make_token(TokenType::TOKEN_EOF);
+        // }
+
+        let c = self.chars.next();
+
+        match c {
+            None => self.make_token(TokenType::TOKEN_EOF),
+            Some(c) =>
+                match c {
+                    '(' => self.make_token(TokenType::TOKEN_LEFT_PAREN),
+                    ')' => self.make_token(TokenType::TOKEN_RIGHT_PAREN),
+                    '{' => self.make_token(TokenType::TOKEN_LEFT_BRACE),
+                    '}' => self.make_token(TokenType::TOKEN_RIGHT_BRACE),
+                    ';' => self.make_token(TokenType::TOKEN_SEMICOLON),
+                    ',' => self.make_token(TokenType::TOKEN_COMMA),
+                    '.' => self.make_token(TokenType::TOKEN_DOT),
+                    '-' => self.make_token(TokenType::TOKEN_MINUS),
+                    '+' => self.make_token(TokenType::TOKEN_PLUS),
+                    '/' => self.make_token(TokenType::TOKEN_SLASH),
+                    '*' => self.make_token(TokenType::TOKEN_STAR),
+                    '!' => {
+                        let x = if self.matchChar('=') { TokenType::TOKEN_BANG_EQUAL } else { TokenType::TOKEN_BANG };
+                        self.make_token(x)
+                    }
+                    '='=> {
+                        let x =if self.matchChar('=') { TokenType::TOKEN_EQUAL_EQUAL } else { TokenType::TOKEN_EQUAL_EQUAL };
+                        self.make_token(x)
+                    }
+                    '<' => {
+                        let x = if self.matchChar('=') { TokenType::TOKEN_LESS_EQUAL } else { TokenType::TOKEN_LESS_EQUAL };
+                        self.make_token(x)
+                    }
+                    '>' => {
+                        let x = if self.matchChar('=') { TokenType::TOKEN_LESS_EQUAL } else { TokenType::TOKEN_GREATER };
+                        self.make_token(x)
+                    }
+                    _   => self.error_token("Unexpected character.")
+                }
         }
 
-        return self.error_token("Unexpected character.");
+
     }
 
     fn make_token(&self, tpe: TokenType) -> Token {
