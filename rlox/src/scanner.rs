@@ -91,6 +91,7 @@ impl Scanner {
             None => self.make_eof(),
             Some(c) =>
                 match c {
+                    d if d.is_digit(10) => self.number(),
                     '(' => self.make_token(TokenType::TOKEN_LEFT_PAREN),
                     ')' => self.make_token(TokenType::TOKEN_RIGHT_PAREN),
                     '{' => self.make_token(TokenType::TOKEN_LEFT_BRACE),
@@ -152,6 +153,32 @@ impl Scanner {
             }
         }
     }
+
+    fn number_fragment(&mut self) {
+        loop {
+            match self.peek() {
+                Some(d) if d.is_digit(10) => { 
+                    self.advance(); 
+                }
+                _ => break  
+            }
+        }
+    }
+    fn number(&mut self) -> Token {
+        self.number_fragment();
+        // Look for a fractional part.
+        match (self.peek(), self.peek_next()) {
+            (Some('.'), Some(d)) if d.is_digit(10) => {
+                // Consume the ".".
+                self.advance();
+
+                self.number_fragment();
+            }
+            _ => {}
+        }      
+      
+        return self.make_token(TokenType::TOKEN_NUMBER);
+      }
 
     fn string(&mut self) -> Token {
         loop {
