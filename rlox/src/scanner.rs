@@ -120,29 +120,21 @@ impl Scanner {
     }
 
     fn skip_whitespace(&mut self) {
-        loop {
-            match self.peek() {
-                Some(' ') | Some('\r') | Some('\t') => {
-                    self.advance();
-                }
-                Some ('\n') => {
+        while let Some(&c) = self.peek() {
+            match c {
+                ' ' | '\r' | '\t' => { self.advance(); }
+                '\n' => {
                     self.line += 1;
                     self.advance();
                 }
-                Some ('/') => { 
-                    match self.peek_next() {
-                        Some('/') => {
-                            loop {
-                                match self.peek() {
-                                    Some('\n') | None => { break }
-                                    _ => { self.advance(); }
-                                }
-                            }
-                        } 
-                        _ => {}
-                }}
+                '/' => if let Some('/') = self.peek_next() {
+                    while let Some(&c) = self.peek() {
+                        if c == '\n' { break; }
+                        else { self.advance(); }
+                    }
+                }
                 _ => {
-                    return
+                    return;
                 }
             }
         }
@@ -200,44 +192,41 @@ impl Scanner {
         }
     }
 
-    fn number_fragment(&mut self) {
-        loop {
-            match self.peek() {
-                Some(d) if d.is_digit(10) => { 
-                    self.advance(); 
-                }
-                _ => break  
-            }
-        }
-    }
     fn number(&mut self) -> Token {
-        self.number_fragment();
+        while let Some(d) = self.peek() {
+            if d.is_digit(10) { self.advance(); }
+            else { break; }
+        }
         // Look for a fractional part.
-        match (self.peek(), self.peek_next()) {
-            (Some('.'), Some(d)) if d.is_digit(10) => {
+        if let (Some('.'), Some(d)) = (self.peek(), self.peek_next()) {
+            if d.is_digit(10) {
                 // Consume the ".".
                 self.advance();
 
-                self.number_fragment();
+                while let Some(d) = self.peek() {
+                    if d.is_digit(10) { self.advance(); }
+                    else { break; }
+                }
             }
-            _ => {}
-        }      
-      
+        }
+
         return self.make_token(TokenType::Number);
       }
 
     fn string(&mut self) -> Token {
-        loop {
-            match self.peek() {
-                None => return self.error_token("Unterminated string."),
-                Some('\n') => { self.line += 1; }
-                Some('"') => {
-                    self.advance();
-                    break;
-                }
-                _ => { self.advance(); }
+        while let Some(&c) = self.peek() {
+            match c {
+                '"' => { break; }
+                '\n' => { self.line += 1; self.advance(); }
+                _ => {  self.advance(); }
             }
         }
+
+        if self.peek().is_none() {
+            return self.error_token("Unterminated string.")
+        }
+
+        // The closing quote.
         self.advance();
         return self.make_token(TokenType::String);
     }
