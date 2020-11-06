@@ -10,12 +10,8 @@ use std::io;
 use std::io::Write;
 use std::process;
 
-use chunk::Chunk;
-use chunk::OpCode;
-
-use value::Value;
-
 use vm::VM;
+use vm::InterpretResult;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -25,7 +21,7 @@ fn main() {
     if args.len() == 1 {
         repl(&mut vm);
     } else if args.len() == 2 {
-        runFile(&mut vm, &args[1]);
+        run_file(&mut vm, &args[1]);
     } else {
         eprint!("Usage: clox [path]\n");
         process::exit(64);
@@ -39,7 +35,7 @@ fn repl(vm: &mut VM) {
         io::stdout().flush().unwrap();
         io::stdin().read_line(&mut line)
             .expect("error: unable to read user input");
-            if (line.is_empty()) {
+            if line.is_empty() {
                 println!();
                 break;
             }
@@ -47,11 +43,12 @@ fn repl(vm: &mut VM) {
     }
 }
 
-fn runFile(vm: &mut VM, f: &String) {
+fn run_file(vm: &mut VM, f: &String) {
     let source = fs::read_to_string(f)
                     .expect("Could not open file");
-    let result = vm.interpret(&source);
-  
-    // if (result == INTERPRET_COMPILE_ERROR) process::exit(65);
-    // if (result == INTERPRET_RUNTIME_ERROR) process::exit(70);
+    match vm.interpret(&source) {
+        InterpretResult::Ok => {}
+        InterpretResult::CompileError => { process::exit(65); }
+        InterpretResult::RuntimeError => { process::exit(70); }
+    } 
 }
