@@ -78,12 +78,9 @@ impl Scanner {
     // mut to make equality in match happy ?
     pub fn scan(&mut self) -> Token {
         self.skip_whitespace();
-
         self.start = self.current;
 
-        let c = self.advance();
-
-        match c {
+        match self.advance() {
             None => self.make_eof(),
             Some(&c) =>
                 match c {
