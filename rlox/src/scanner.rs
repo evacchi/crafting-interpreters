@@ -91,6 +91,7 @@ impl Scanner {
             None => self.make_eof(),
             Some(c) =>
                 match c {
+                    d if '_' == *d || d.is_alphabetic() => self.identifier(),
                     d if d.is_digit(10) => self.number(),
                     '(' => self.make_token(TokenType::TOKEN_LEFT_PAREN),
                     ')' => self.make_token(TokenType::TOKEN_RIGHT_PAREN),
@@ -150,6 +151,58 @@ impl Scanner {
                 _ => {
                     return
                 }
+            }
+        }
+    }
+
+    fn check_keyword(&self, start: usize, length: usize, rest: &str, tpe: TokenType) -> TokenType {
+        if self.current - self.start == start + length &&
+            String::from(& self.source[self.start + start .. self.start + start + length]) == String::from(rest) {
+            tpe
+        } else {
+            TokenType::TOKEN_IDENTIFIER
+        }
+    }
+
+    fn identifier_type(&self) -> TokenType {
+        match self.chars[self.start] {
+            'a' => self.check_keyword(1, 2, "nd", TokenType::TOKEN_AND),
+            'c' => self.check_keyword(1, 4, "lass", TokenType::TOKEN_CLASS),
+            'e' => self.check_keyword(1, 3, "lse", TokenType::TOKEN_ELSE),
+            'i' => self.check_keyword(1, 1, "f", TokenType::TOKEN_IF),
+            'f' if self.current - self.start > 1 => {
+                match self.chars[self.start + 1] {
+                        'a'=> return self.check_keyword(2, 3, "lse", TokenType::TOKEN_FALSE),
+                        'o'=> return self.check_keyword(2, 1, "r", TokenType::TOKEN_FOR),
+                        'u'=> return self.check_keyword(2, 1, "n", TokenType::TOKEN_FUN),
+                        _ => TokenType::TOKEN_IDENTIFIER
+                    }
+                }
+            'n' => self.check_keyword(1, 2, "il", TokenType::TOKEN_NIL),
+            'o' => self.check_keyword(1, 1, "r", TokenType::TOKEN_OR),
+            'p' => self.check_keyword(1, 4, "rint", TokenType::TOKEN_PRINT),
+            'r' => self.check_keyword(1, 5, "eturn", TokenType::TOKEN_RETURN),
+            's' => self.check_keyword(1, 4, "uper", TokenType::TOKEN_SUPER),
+            't' if self.current - self.start > 1 => {
+                match self.chars[self.start + 1] {
+                        'h'=> return self.check_keyword(2, 2, "is", TokenType::TOKEN_THIS),
+                        'r'=> return self.check_keyword(2, 2, "ue", TokenType::TOKEN_TRUE),
+                        _ => TokenType::TOKEN_IDENTIFIER
+                    }
+                }
+            'v' => self.check_keyword(1, 2, "ar", TokenType::TOKEN_VAR),
+            'w' => self.check_keyword(1, 4, "hile", TokenType::TOKEN_WHILE),
+            _ => TokenType::TOKEN_IDENTIFIER,
+          }
+    }
+
+    fn identifier(&mut self) -> Token {
+        loop {
+            match self.peek() {
+                Some(c) if c.is_digit(10) || c.is_alphabetic() || *c == '_' => {
+                    self.advance();
+                }
+                _ => return self.make_token(self.identifier_type())
             }
         }
     }
