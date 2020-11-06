@@ -65,6 +65,10 @@ impl Scanner {
         self.chars.get(self.current)
     }
 
+    fn peek_next(&self) -> Option<&char> {
+        self.chars.get(1 + self.current)
+    }
+
     fn matchChar(&mut self, expected: char) -> bool {
         match self.chars.get(self.current) {
             Some(c) if *c == expected => {
@@ -84,7 +88,7 @@ impl Scanner {
         let c = self.advance();
 
         match c {
-            None => self.make_token(TokenType::TOKEN_EOF),
+            None => self.make_eof(),
             Some(c) =>
                 match c {
                     '(' => self.make_token(TokenType::TOKEN_LEFT_PAREN),
@@ -114,11 +118,10 @@ impl Scanner {
                         let x = if self.matchChar('=') { TokenType::TOKEN_LESS_EQUAL } else { TokenType::TOKEN_GREATER };
                         self.make_token(x)
                     }
+                    '"' => self.string(),
                     _   => self.error_token("Unexpected character.")
                 }
         }
-
-
     }
 
     fn skip_whitespace(&mut self) {
@@ -131,18 +134,53 @@ impl Scanner {
                     self.line += 1;
                     self.advance();
                 }
+                Some ('/') => { 
+                    match self.peek_next() {
+                        Some('/') => {
+                            loop {
+                                match self.peek() {
+                                    Some('\n') | None => { break }
+                                    _ => { self.advance(); }
+                                }
+                            }
+                        } 
+                        _ => {}
+                }}
                 _ => {
                     return
                 }
-
             }
+        }
+    }
+
+    fn string(&mut self) -> Token {
+        loop {
+            match self.peek() {
+                None => return self.error_token("Unterminated string."),
+                Some('\n') => { self.line += 1; }
+                Some('"') => {
+                    self.advance();
+                    break;
+                }
+                _ => { self.advance(); }
+            }
+        }
+        self.advance();
+        return self.make_token(TokenType::TOKEN_STRING);
+    }
+
+    fn make_eof(&self) -> Token {
+        Token {
+            tpe:     TokenType::TOKEN_EOF,
+            text: String::from(&self.source[self.start..self.current-1]),
+            line: self.line
         }
     }
 
     fn make_token(&self, tpe: TokenType) -> Token {
         Token {
             tpe: tpe,
-            text: String::from(&self.source[self.start..self.current-1]),
+            text: String::from(&self.source[self.start..self.current]),
             line: self.line
         }
     }
