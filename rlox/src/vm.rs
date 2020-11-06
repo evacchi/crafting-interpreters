@@ -1,5 +1,6 @@
 use chunk::Chunk;
 use chunk::OpCode;
+use compiler;
 use value::Value;
 
 pub struct VM {
@@ -18,10 +19,9 @@ impl VM {
     pub fn new() -> VM {
         VM { chunk: Chunk::new(), ip: 0, stack: Vec::new() }
     }
-    pub fn interpret(&mut self, chunk: Chunk) -> InterpretResult {
-        self.chunk = chunk;
-        self.ip = 0;
-        return self.run();
+    pub fn interpret(&mut self, source: &String) -> InterpretResult {
+        compiler::compile(source.to_string());
+        return InterpretResult::Ok;
     }
     fn run(&mut self) -> InterpretResult {
         loop {

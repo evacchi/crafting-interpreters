@@ -1,6 +1,13 @@
 mod chunk;
+mod compiler;
+mod scanner;
 mod vm;
 mod value;
+
+use std::env;
+use std::fs;
+use std::io;
+use std::process;
 
 use chunk::Chunk;
 use chunk::OpCode;
@@ -10,23 +17,39 @@ use value::Value;
 use vm::VM;
 
 fn main() {
+    let args: Vec<String> = env::args().collect();
+
     let mut vm = VM::new();
-    let mut chunk = Chunk::new();
 
-    let index = chunk.write_constant(Value(1.2));
-    chunk.write(OpCode::Constant{ index }, 123);
+    if args.len() == 1 {
+        repl(&mut vm);
+    } else if args.len() == 2 {
+        runFile(&mut vm, &args[1]);
+    } else {
+        eprint!("Usage: clox [path]\n");
+        process::exit(64);
+    }
+}
 
-    let index = chunk.write_constant(Value(3.4));
-    chunk.write(OpCode::Constant{ index }, 123);
-    chunk.write(OpCode::Add, 123);
+fn repl(vm: &mut VM) {
+    let mut line = String::new();
+    loop {
+        print!("> ");
+        io::stdin().read_line(&mut line)
+            .expect("error: unable to read user input");
+            if (line.is_empty()) {
+                println!();
+                break;
+            }
+        vm.interpret(&line);
+    }
+}
 
-    let index = chunk.write_constant(Value(5.6));
-    chunk.write(OpCode::Constant{ index }, 123);
-
-    chunk.write(OpCode::Divide, 123);
-    chunk.write(OpCode::Negate, 123);
-    chunk.write(OpCode::Return, 123);
-    
-    chunk.disassemble("test chunk");
-    vm.interpret(chunk);
+fn runFile(vm: &mut VM, f: &String) {
+    let source = fs::read_to_string(f)
+                    .expect("Could not open file");
+    let result = vm.interpret(&source);
+  
+    // if (result == INTERPRET_COMPILE_ERROR) process::exit(65);
+    // if (result == INTERPRET_RUNTIME_ERROR) process::exit(70);
 }
