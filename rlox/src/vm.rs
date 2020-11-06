@@ -35,37 +35,37 @@ impl VM {
             }
             print!("\n");
             
-            instruction.disassemble(self.ip);
+            self.chunk.disassemble_instruction(self.ip);
             match instruction {
-                OpCode::Constant { offset, line } => {
-                    let value = self.chunk.read_constant(offset);
+                OpCode::Constant { index } => {
+                    let value = self.chunk.read_constant(index);
                     self.stack.push(value);
                 }
-                OpCode::Add      { line } => {
+                OpCode::Add => {
                     let b = self.stack.pop().unwrap().0;
                     let a = self.stack.pop().unwrap().0;
                     self.stack.push(Value(a + b))
                 }
-                OpCode::Subtract { line } => {
+                OpCode::Subtract => {
                     let b = self.stack.pop().unwrap().0;
                     let a = self.stack.pop().unwrap().0;
                     self.stack.push(Value(a - b))
                 }
-                OpCode::Multiply { line } => {
+                OpCode::Multiply => {
                     let b = self.stack.pop().unwrap().0;
                     let a = self.stack.pop().unwrap().0;
                     self.stack.push(Value(a * b))
                 }
-                OpCode::Divide   { line } => {
+                OpCode::Divide   => {
                     let b = self.stack.pop().unwrap().0;
                     let a = self.stack.pop().unwrap().0;
                     self.stack.push(Value(a / b))
                 }                
-                OpCode::Negate { line } => {
+                OpCode::Negate => {
                     let v = self.stack.pop().unwrap();
                     self.stack.push(Value( -v.0 ));
                 }
-                OpCode::Return { line } => {
+                OpCode::Return => {
                     self.stack.pop().unwrap().print();
                     print!("\n");
                     return InterpretResult::Ok

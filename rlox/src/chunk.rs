@@ -2,24 +2,19 @@ use value::Value;
 
 #[derive(Debug,Copy,Clone)]
 pub enum OpCode {
-    Constant { offset: usize, line: usize },
-    Negate   { line: usize },
-    Return   { line: usize },
-    Add      { line: usize },
-    Subtract { line: usize },
-    Multiply { line: usize },
-    Divide   { line: usize },
-}
-
-impl OpCode {
-    pub fn disassemble(&self, offset: usize) {
-        print!("{:04} {:?}\n", offset, &self);
-    }
+    Constant { index: usize },
+    Negate   ,
+    Return   ,
+    Add      ,
+    Subtract ,
+    Multiply ,
+    Divide   ,
 }
 
 pub struct Chunk {
     code: Vec<OpCode>,
-    values: Vec<Value>
+    values: Vec<Value>,
+    lines: Vec<usize>
 }
 
 impl Chunk {
@@ -27,6 +22,7 @@ impl Chunk {
         Chunk {
             code : Vec::new(),
             values : Vec::new(),
+            lines : Vec::new(),
         }
     }
 
@@ -40,8 +36,9 @@ impl Chunk {
         self.values[offset]
     }
 
-    pub fn write(&mut self, op: OpCode) {
-        self.code.push(op)
+    pub fn write(&mut self, op: OpCode, line: usize) {
+        self.code.push(op);
+        self.lines.push(line);
     }
 
     pub fn fetch(&self, ip: usize) -> OpCode {
@@ -51,9 +48,48 @@ impl Chunk {
     pub fn disassemble(&self, name: &str) {
         print!("== {} ==\n", name);
     
-        for (i, op) in self.code.iter().enumerate() {
-            op.disassemble(i);
+        for i in 0..self.code.len() {
+            self.disassemble_instruction(i);
         }
+    }
+
+    pub fn disassemble_instruction(&self, offset: usize) {
+        print!("{:04} ", offset);
+        let op = &self.code[offset];
+        if offset > 0 &&
+           self.lines[offset] == self.lines[offset - 1] {
+           print!("   | ")
+        } else {
+            print!("{:4} ", self.lines[offset]);
+        }        
+        match op {
+            OpCode::Constant { index } => 
+                self.constant_instruction("CONSTANT", index),
+            OpCode::Add => 
+                self.simple_instruction("ADD"),
+            OpCode::Subtract => 
+                self.simple_instruction("SUBTRACT"),
+            OpCode::Multiply => 
+                self.simple_instruction("MULTIPLY"),
+            OpCode::Divide => 
+                self.simple_instruction("DIVIDE"),
+            OpCode::Negate =>
+                self.simple_instruction("NEGATE"),
+            OpCode::Return => 
+                self.simple_instruction("RETURN"),
+            _ =>
+                print!("Unknown opcode {:?}\n", op)
+        }
+    }
+
+    fn constant_instruction(&self, op: &str, offset: &usize) {
+        print!("{:16} {:4} '", op, offset);
+        self.values[*offset].print();
+        print!("'\n");
+    }
+
+    fn simple_instruction(&self, op: &str) {
+        print!("{}\n", op)
     }
 
 }
