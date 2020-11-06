@@ -1,7 +1,3 @@
-use std::str::Chars;
-use std::vec::IntoIter;
-use std::iter::Peekable;
-
 pub struct Scanner {
     source: String,
     chars: Vec<char>,
@@ -69,9 +65,9 @@ impl Scanner {
         self.chars.get(1 + self.current)
     }
 
-    fn matchChar(&mut self, expected: char) -> bool {
+    fn match_char(&mut self, expected: char) -> bool {
         match self.chars.get(self.current) {
-            Some(c) if *c == expected => {
+            Some(&c) if c == expected => {
                 self.current += 1;
                 return true
             }
@@ -89,9 +85,9 @@ impl Scanner {
 
         match c {
             None => self.make_eof(),
-            Some(c) =>
+            Some(&c) =>
                 match c {
-                    d if '_' == *d || d.is_alphabetic() => self.identifier(),
+                    d if '_' == d || d.is_alphabetic() => self.identifier(),
                     d if d.is_digit(10) => self.number(),
                     '(' => self.make_token(TokenType::LeftParen),
                     ')' => self.make_token(TokenType::RightParen),
@@ -104,22 +100,19 @@ impl Scanner {
                     '+' => self.make_token(TokenType::Plus),
                     '/' => self.make_token(TokenType::Slash),
                     '*' => self.make_token(TokenType::Star),
-                    '!' => {
-                        let x = if self.matchChar('=') { TokenType::BangEqual } else { TokenType::Bang };
-                        self.make_token(x)
-                    }
-                    '='=> {
-                        let x =if self.matchChar('=') { TokenType::EqualEqual } else { TokenType::Equal };
-                        self.make_token(x)
-                    }
-                    '<' => {
-                        let x = if self.matchChar('=') { TokenType::LessEqual } else { TokenType::Less };
-                        self.make_token(x)
-                    }
-                    '>' => {
-                        let x = if self.matchChar('=') { TokenType::GreaterEqual } else { TokenType::Greater };
-                        self.make_token(x)
-                    }
+                    '!' if self.match_char('=') =>  
+                        self.make_token(TokenType::BangEqual),
+                    '!' => self.make_token(TokenType::Bang),
+                    '=' if self.match_char('=') => 
+                        self.make_token(TokenType::EqualEqual),
+                    '=' => self.make_token(TokenType::Equal),
+                    '<' if self.match_char('=') =>
+                        self.make_token(TokenType::LessEqual),
+                    '<' =>
+                        self.make_token(TokenType::Less),
+                    '>' if self.match_char('=') =>
+                        self.make_token(TokenType::GreaterEqual),
+                    '>' => self.make_token(TokenType::Greater),
                     '"' => self.string(),
                     _   => self.error_token("Unexpected character.")
                 }
@@ -251,7 +244,7 @@ impl Scanner {
 
     fn make_eof(&self) -> Token {
         Token {
-            tpe:     TokenType::Eof,
+            tpe:  TokenType::Eof,
             text: String::from(&self.source[self.start..self.current-1]),
             line: self.line
         }

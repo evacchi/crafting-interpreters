@@ -77,8 +77,6 @@ impl Chunk {
                 self.simple_instruction("NEGATE"),
             OpCode::Return => 
                 self.simple_instruction("RETURN"),
-            _ =>
-                print!("Unknown opcode {:?}\n", op)
         }
     }
 
