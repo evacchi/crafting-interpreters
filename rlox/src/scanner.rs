@@ -14,28 +14,28 @@ pub struct Scanner {
 #[derive(Debug,PartialEq)]
 pub enum TokenType {
     // Single-character tokens.
-    TOKEN_LEFT_PAREN, TOKEN_RIGHT_PAREN,
-    TOKEN_LEFT_BRACE, TOKEN_RIGHT_BRACE,
-    TOKEN_COMMA, TOKEN_DOT, TOKEN_MINUS, TOKEN_PLUS,
-    TOKEN_SEMICOLON, TOKEN_SLASH, TOKEN_STAR,
+    LeftParen, RightParen,
+    LeftBrace, RightBrace,
+    Comma, Dot, Minus, Plus,
+    Semicolon, Slash, Star,
     
     // One or two character tokens.
-    TOKEN_BANG, TOKEN_BANG_EQUAL,
-    TOKEN_EQUAL, TOKEN_EQUAL_EQUAL,
-    TOKEN_GREATER, TOKEN_GREATER_EQUAL,
-    TOKEN_LESS, TOKEN_LESS_EQUAL,
+    Bang, BangEqual,
+    Equal, EqualEqual,
+    Greater, GreaterEqual,
+    Less, LessEqual,
     
     // Literals.
-    TOKEN_IDENTIFIER, TOKEN_STRING, TOKEN_NUMBER,
+    Identifier, String, Number,
     
     // Keywords.
-    TOKEN_AND, TOKEN_CLASS, TOKEN_ELSE, TOKEN_FALSE,
-    TOKEN_FOR, TOKEN_FUN, TOKEN_IF, TOKEN_NIL, TOKEN_OR,
-    TOKEN_PRINT, TOKEN_RETURN, TOKEN_SUPER, TOKEN_THIS,
-    TOKEN_TRUE, TOKEN_VAR, TOKEN_WHILE,
+    And, Class, Else, False,
+    For, Fun, If, Nil, Or,
+    Print, Return, Super, This,
+    True, Var, While,
     
-    TOKEN_ERROR,
-    TOKEN_EOF
+    Error,
+    Eof,    
 }
 
 pub struct Token {
@@ -93,31 +93,31 @@ impl Scanner {
                 match c {
                     d if '_' == *d || d.is_alphabetic() => self.identifier(),
                     d if d.is_digit(10) => self.number(),
-                    '(' => self.make_token(TokenType::TOKEN_LEFT_PAREN),
-                    ')' => self.make_token(TokenType::TOKEN_RIGHT_PAREN),
-                    '{' => self.make_token(TokenType::TOKEN_LEFT_BRACE),
-                    '}' => self.make_token(TokenType::TOKEN_RIGHT_BRACE),
-                    ';' => self.make_token(TokenType::TOKEN_SEMICOLON),
-                    ',' => self.make_token(TokenType::TOKEN_COMMA),
-                    '.' => self.make_token(TokenType::TOKEN_DOT),
-                    '-' => self.make_token(TokenType::TOKEN_MINUS),
-                    '+' => self.make_token(TokenType::TOKEN_PLUS),
-                    '/' => self.make_token(TokenType::TOKEN_SLASH),
-                    '*' => self.make_token(TokenType::TOKEN_STAR),
+                    '(' => self.make_token(TokenType::LeftParen),
+                    ')' => self.make_token(TokenType::RightParen),
+                    '{' => self.make_token(TokenType::LeftBrace),
+                    '}' => self.make_token(TokenType::RightBrace),
+                    ';' => self.make_token(TokenType::Semicolon),
+                    ',' => self.make_token(TokenType::Comma),
+                    '.' => self.make_token(TokenType::Dot),
+                    '-' => self.make_token(TokenType::Minus),
+                    '+' => self.make_token(TokenType::Plus),
+                    '/' => self.make_token(TokenType::Slash),
+                    '*' => self.make_token(TokenType::Star),
                     '!' => {
-                        let x = if self.matchChar('=') { TokenType::TOKEN_BANG_EQUAL } else { TokenType::TOKEN_BANG };
+                        let x = if self.matchChar('=') { TokenType::BangEqual } else { TokenType::Bang };
                         self.make_token(x)
                     }
                     '='=> {
-                        let x =if self.matchChar('=') { TokenType::TOKEN_EQUAL_EQUAL } else { TokenType::TOKEN_EQUAL_EQUAL };
+                        let x =if self.matchChar('=') { TokenType::EqualEqual } else { TokenType::Equal };
                         self.make_token(x)
                     }
                     '<' => {
-                        let x = if self.matchChar('=') { TokenType::TOKEN_LESS_EQUAL } else { TokenType::TOKEN_LESS_EQUAL };
+                        let x = if self.matchChar('=') { TokenType::LessEqual } else { TokenType::Less };
                         self.make_token(x)
                     }
                     '>' => {
-                        let x = if self.matchChar('=') { TokenType::TOKEN_LESS_EQUAL } else { TokenType::TOKEN_GREATER };
+                        let x = if self.matchChar('=') { TokenType::GreaterEqual } else { TokenType::Greater };
                         self.make_token(x)
                     }
                     '"' => self.string(),
@@ -160,39 +160,39 @@ impl Scanner {
             String::from(& self.source[self.start + start .. self.start + start + length]) == String::from(rest) {
             tpe
         } else {
-            TokenType::TOKEN_IDENTIFIER
+            TokenType::Identifier
         }
     }
 
     fn identifier_type(&self) -> TokenType {
         match self.chars[self.start] {
-            'a' => self.check_keyword(1, 2, "nd", TokenType::TOKEN_AND),
-            'c' => self.check_keyword(1, 4, "lass", TokenType::TOKEN_CLASS),
-            'e' => self.check_keyword(1, 3, "lse", TokenType::TOKEN_ELSE),
-            'i' => self.check_keyword(1, 1, "f", TokenType::TOKEN_IF),
+            'a' => self.check_keyword(1, 2, "nd", TokenType::And),
+            'c' => self.check_keyword(1, 4, "lass", TokenType::Class),
+            'e' => self.check_keyword(1, 3, "lse", TokenType::Else),
+            'i' => self.check_keyword(1, 1, "f", TokenType::If),
             'f' if self.current - self.start > 1 => {
                 match self.chars[self.start + 1] {
-                        'a'=> return self.check_keyword(2, 3, "lse", TokenType::TOKEN_FALSE),
-                        'o'=> return self.check_keyword(2, 1, "r", TokenType::TOKEN_FOR),
-                        'u'=> return self.check_keyword(2, 1, "n", TokenType::TOKEN_FUN),
-                        _ => TokenType::TOKEN_IDENTIFIER
+                        'a'=> return self.check_keyword(2, 3, "lse", TokenType::False),
+                        'o'=> return self.check_keyword(2, 1, "r", TokenType::For),
+                        'u'=> return self.check_keyword(2, 1, "n", TokenType::Fun),
+                        _ => TokenType::Identifier
                     }
                 }
-            'n' => self.check_keyword(1, 2, "il", TokenType::TOKEN_NIL),
-            'o' => self.check_keyword(1, 1, "r", TokenType::TOKEN_OR),
-            'p' => self.check_keyword(1, 4, "rint", TokenType::TOKEN_PRINT),
-            'r' => self.check_keyword(1, 5, "eturn", TokenType::TOKEN_RETURN),
-            's' => self.check_keyword(1, 4, "uper", TokenType::TOKEN_SUPER),
+            'n' => self.check_keyword(1, 2, "il", TokenType::Nil),
+            'o' => self.check_keyword(1, 1, "r", TokenType::Or),
+            'p' => self.check_keyword(1, 4, "rint", TokenType::Print),
+            'r' => self.check_keyword(1, 5, "eturn", TokenType::Return),
+            's' => self.check_keyword(1, 4, "uper", TokenType::Super),
             't' if self.current - self.start > 1 => {
                 match self.chars[self.start + 1] {
-                        'h'=> return self.check_keyword(2, 2, "is", TokenType::TOKEN_THIS),
-                        'r'=> return self.check_keyword(2, 2, "ue", TokenType::TOKEN_TRUE),
-                        _ => TokenType::TOKEN_IDENTIFIER
+                        'h'=> return self.check_keyword(2, 2, "is", TokenType::This),
+                        'r'=> return self.check_keyword(2, 2, "ue", TokenType::True),
+                        _ => TokenType::Identifier
                     }
                 }
-            'v' => self.check_keyword(1, 2, "ar", TokenType::TOKEN_VAR),
-            'w' => self.check_keyword(1, 4, "hile", TokenType::TOKEN_WHILE),
-            _ => TokenType::TOKEN_IDENTIFIER,
+            'v' => self.check_keyword(1, 2, "ar", TokenType::Var),
+            'w' => self.check_keyword(1, 4, "hile", TokenType::While),
+            _ => TokenType::Identifier,
           }
     }
 
@@ -230,7 +230,7 @@ impl Scanner {
             _ => {}
         }      
       
-        return self.make_token(TokenType::TOKEN_NUMBER);
+        return self.make_token(TokenType::Number);
       }
 
     fn string(&mut self) -> Token {
@@ -246,12 +246,12 @@ impl Scanner {
             }
         }
         self.advance();
-        return self.make_token(TokenType::TOKEN_STRING);
+        return self.make_token(TokenType::String);
     }
 
     fn make_eof(&self) -> Token {
         Token {
-            tpe:     TokenType::TOKEN_EOF,
+            tpe:     TokenType::Eof,
             text: String::from(&self.source[self.start..self.current-1]),
             line: self.line
         }
@@ -267,7 +267,7 @@ impl Scanner {
 
     fn error_token(&self, message: &str) -> Token {
         Token {
-            tpe: TokenType::TOKEN_ERROR,
+            tpe: TokenType::Error,
             text: String::from(message),
             line: self.line
         }

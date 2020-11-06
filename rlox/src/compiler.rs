@@ -14,7 +14,7 @@ pub fn compile(source: String) {
         }
         print!("{:?} '{}'\n", token.tpe, token.text);
 
-        if token.tpe == TokenType::TOKEN_EOF {
+        if token.tpe == TokenType::Eof {
             break;  
         } 
     }
