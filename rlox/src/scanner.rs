@@ -4,7 +4,7 @@ use std::iter::Peekable;
 
 pub struct Scanner {
     source: String,
-    chars: Peekable<IntoIter<char>>,
+    chars: Vec<char>,
     start: usize,
     current: usize,
     line: usize
@@ -48,35 +48,40 @@ impl Scanner {
     pub fn new(source: String) -> Scanner {
         Scanner {
             source: source.to_string(),
-            chars: source.chars().collect::<Vec<_>>().into_iter().peekable(),
+            chars: source.chars().collect::<Vec<_>>(),
             start: 0,
             current: 0,
             line: 1
         }
     }
 
-    // mut to make equality happy ?
+    fn advance(&mut self) -> Option<&char> {
+        let c = self.chars.get(self.current);
+        self.current += 1;
+        c
+    }
+
+    fn peek(&self) -> Option<&char> {
+        self.chars.get(self.current)
+    }
+
     fn matchChar(&mut self, expected: char) -> bool {
-        match self.chars.peek() {
-            None => false,
-            Some(c) => if *c == expected {
-                self.chars.next();
-                true
-            } else {
-                false
+        match self.chars.get(self.current) {
+            Some(c) if *c == expected => {
+                self.current += 1;
+                return true
             }
+            _ => return false
         }
     }
 
-
     // mut to make equality in match happy ?
     pub fn scan(&mut self) -> Token {
-        self.start = self.current;
-        // if self.is_at_end() {
-        //     return self.make_token(TokenType::TOKEN_EOF);
-        // }
+        self.skip_whitespace();
 
-        let c = self.chars.next();
+        self.start = self.current;
+
+        let c = self.advance();
 
         match c {
             None => self.make_token(TokenType::TOKEN_EOF),
@@ -116,10 +121,28 @@ impl Scanner {
 
     }
 
+    fn skip_whitespace(&mut self) {
+        loop {
+            match self.peek() {
+                Some(' ') | Some('\r') | Some('\t') => {
+                    self.advance();
+                }
+                Some ('\n') => {
+                    self.line += 1;
+                    self.advance();
+                }
+                _ => {
+                    return
+                }
+
+            }
+        }
+    }
+
     fn make_token(&self, tpe: TokenType) -> Token {
         Token {
             tpe: tpe,
-            text: String::from(&self.source[self.start..(self.current - self.start)]),
+            text: String::from(&self.source[self.start..self.current-1]),
             line: self.line
         }
     }
