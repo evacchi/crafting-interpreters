@@ -1,6 +1,6 @@
 use chunk::Chunk;
 use chunk::OpCode;
-use compiler;
+use compiler::Compiler;
 use value::Value;
 
 pub struct VM {
@@ -20,8 +20,11 @@ impl VM {
         VM { chunk: Chunk::new(), ip: 0, stack: Vec::new() }
     }
     pub fn interpret(&mut self, source: &String) -> InterpretResult {
-        compiler::compile(source.to_string());
-        return InterpretResult::Ok;
+        let mut compiler = Compiler::new(source.to_string());
+        if !compiler.compile() {
+            return InterpretResult::CompileError;
+        }
+        return self.run();
     }
     fn run(&mut self) -> InterpretResult {
         loop {

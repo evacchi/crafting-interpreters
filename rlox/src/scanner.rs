@@ -7,8 +7,11 @@ pub struct Scanner {
 
 }
 
-#[derive(Debug,PartialEq)]
+#[derive(Debug,PartialEq,Clone)]
 pub enum TokenType {
+    // parser internal initial state
+    Start,
+
     // Single-character tokens.
     LeftParen, RightParen,
     LeftBrace, RightBrace,
@@ -40,6 +43,16 @@ pub struct Token {
     pub line: usize
 }
 
+impl Clone for Token {
+    fn clone(&self) -> Self {
+        Token {
+            tpe: self.tpe.clone(),
+            text: self.text.clone(),
+            line: self.line
+        }
+    }
+}
+
 impl Scanner {
     pub fn new(source: String) -> Scanner {
         Scanner {
@@ -51,7 +64,7 @@ impl Scanner {
         }
     }
 
-    fn advance(&mut self) -> Option<&char> {
+    pub fn advance(&mut self) -> Option<&char> {
         let c = self.chars.get(self.current);
         self.current += 1;
         c
