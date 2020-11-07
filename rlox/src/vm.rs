@@ -24,6 +24,8 @@ impl VM {
         if !compiler.compile() {
             return InterpretResult::CompileError;
         }
+        self.chunk = compiler.chunk();
+        self.ip = 0;
         return self.run();
     }
     fn run(&mut self) -> InterpretResult {

@@ -29,8 +29,8 @@ fn main() {
 }
 
 fn repl(vm: &mut VM) {
-    let mut line = String::new();
     loop {
+        let mut line = String::new();
         print!("> ");
         io::stdout().flush().unwrap();
         io::stdin().read_line(&mut line)

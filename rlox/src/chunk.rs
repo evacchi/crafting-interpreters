@@ -11,6 +11,7 @@ pub enum OpCode {
     Divide   ,
 }
 
+#[derive(Clone)]
 pub struct Chunk {
     code: Vec<OpCode>,
     values: Vec<Value>,

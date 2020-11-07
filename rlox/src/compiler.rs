@@ -1,47 +1,166 @@
+use std::cmp::Eq;
+use std::cmp::PartialOrd;
+
+use chunk::Chunk;
+use chunk::OpCode;
+
 use scanner::Scanner;
 use scanner::Token;
 use scanner::TokenType;
 
-use chunk::Chunk;
-use chunk::OpCode;
+use value::Value;
+
+#[derive(PartialEq,PartialOrd)]
+enum Precedence {
+    None,
+    Assignment,  // =
+    Or,          // or
+    And,         // and
+    Equality,    // == !=
+    Comparison,  // < > <= >=
+    Term,        // + -
+    Factor,      // * /
+    Unary,       // ! -
+    Call,        // . ()
+    Primary
+}
+
+impl Precedence {
+    fn from_index(index: usize) -> Option<Precedence> {
+        match index {
+            0  => Some(Precedence::None),
+            1  => Some(Precedence::Assignment), 
+            2  => Some(Precedence::Or),         
+            3  => Some(Precedence::And),        
+            4  => Some(Precedence::Equality),   
+            5  => Some(Precedence::Comparison), 
+            6  => Some(Precedence::Term),       
+            7  => Some(Precedence::Factor),     
+            8  => Some(Precedence::Unary),      
+            9  => Some(Precedence::Call),       
+            10 => Some(Precedence::Primary),
+            _  => None
+        }
+    }
+}
+
+
+type BinaryRule = fn(&mut Parser) -> ();
+
+type UnaryRule = fn(&mut Parser) -> ();
+
+struct ParseRule{
+    prefix: BinaryRule,
+    infix: UnaryRule, 
+    precedence: Precedence
+}
 
 struct Parser {
     scanner: Scanner,
     current: Token,
     previous: Token,
     had_error: bool,
-    panic_mode: bool
+    panic_mode: bool,
+    emitter: BytecodeEmitter
 }
 
 pub struct Compiler {
     parser: Parser,
-    current_chunk: Chunk
 }
 
 impl Compiler {
     pub fn new(source: String) -> Compiler {
         Compiler {
-            parser: Parser::new(source),
-            current_chunk: Chunk::new()
+            parser: Parser::new(source)
         }
     }
     pub fn compile(&mut self) -> bool {
         self.parser.advance();
         self.parser.expression();
         self.parser.consume(TokenType::Eof, "Expect end of expression.");
-        self.end();
+        self.parser.end(self.parser.previous.line);
         !self.parser.had_error
     }
-    pub fn emit_byte(&mut self, op: OpCode) {
-        self.current_chunk.write(op, self.parser.previous.line);
+    pub fn chunk(&self) -> Chunk {
+        self.parser.emitter.current_chunk.clone()
     }
-    pub fn end(&mut self) {
-        self.emit_return();
+}
+
+struct BytecodeEmitter {
+    current_chunk: Chunk
+}
+
+impl BytecodeEmitter {
+    pub fn new() -> BytecodeEmitter { 
+        BytecodeEmitter {
+            current_chunk : Chunk::new()
+        }
     }
-    fn emit_return(&mut self) {
-        self.emit_byte(OpCode::Return);
+    pub fn emit_byte(&mut self, op: OpCode, line: usize) {
+        self.current_chunk.write(op, line);
     }
-      
+
+    pub fn emit_return(&mut self, line: usize) {
+        self.emit_byte(OpCode::Return, line);
+    }
+    pub fn emit_constant(&mut self, value: Value, line: usize) {
+        let index = self.current_chunk.write_constant(value);
+        self.emit_byte(OpCode::Constant{ index }, line);
+    }
+
+}
+
+impl ParseRule {
+    fn new(prefix: BinaryRule, infix: UnaryRule, precedence: Precedence) -> ParseRule {
+        ParseRule { prefix, infix, precedence }
+    }
+
+
+    fn of_token(tpe: &TokenType) -> ParseRule {
+        match tpe {
+            TokenType::Start        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::LeftParen    => ParseRule::new(Parser::grouping, Parser::err,      Precedence::None),
+            TokenType::RightParen   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::LeftBrace    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None), 
+            TokenType::RightBrace   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Comma        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Dot          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Minus        => ParseRule::new(Parser::unary,    Parser::binary,   Precedence::Term),
+            TokenType::Plus         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Term),
+            TokenType::Semicolon    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Slash        => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
+            TokenType::Star         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
+            TokenType::Bang         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::BangEqual    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Equal        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::EqualEqual   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Greater      => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::GreaterEqual => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Less         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::LessEqual    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Identifier   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::String       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Number       => ParseRule::new(Parser::number,   Parser::err,      Precedence::None),
+            TokenType::And          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Class        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Else         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::False        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::For          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Fun          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::If           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Nil          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Or           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Print        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Return       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Super        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::This         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::True         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Var          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::While        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Error        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Eof          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+        }
+    }
 }
 
 impl Parser {
@@ -60,6 +179,8 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
+            emitter: BytecodeEmitter::new()
+
         }
     }
 
@@ -83,14 +204,88 @@ impl Parser {
         self.error_at_current(message);
     }
 
-    pub fn expression(&self) {
 
+    fn grouping(&mut self) {
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after expression.");
+      }
+
+    pub fn number(&mut self) {
+        let n = self.previous.text.parse::<f64>().unwrap();
+        self.emitter.emit_constant(Value(n), self.previous.line);
     }
 
+    fn unary(&mut self) {
+        let tok = self.previous.clone();
+      
+        // Compile the operand.
+        self.parse_precedence(Precedence::Unary);
+      
+        // Emit the operator instruction.
+        match tok.tpe {
+          TokenType::Minus => self.emitter.emit_byte(OpCode::Negate, self.previous.line),
+          _ => {} // Unreachable.
+        }
+    }
+      
+    fn parse_precedence(&mut self, precedence: Precedence) {
+        self.advance();
+        let prefix_rule = ParseRule::of_token(&self.previous.tpe).prefix;      
+        prefix_rule(self);
+
+        while precedence <= ParseRule::of_token(&self.current.tpe).precedence {
+            self.advance();
+            let infix_rule = ParseRule::of_token(&self.previous.tpe).infix;
+            infix_rule(self);
+          }
+        
+    }
+
+    pub fn expression(&mut self) {
+        self.parse_precedence(Precedence::Assignment)
+    }
+    
+
+    pub fn end(&mut self, line: usize) {
+        self.emitter.emit_return(line);
+        // debug statements
+        if !self.had_error {
+            self.emitter.current_chunk.disassemble("code");
+        }        
+    }
+
+    pub fn binary(&mut self) {
+        // Remember the operator.
+        let tok = self.previous.clone();
+        let line = self.previous.line;
+      
+        // Compile the right operand.
+        let rule = ParseRule::of_token(&tok.tpe);
+        let next_rule = rule.precedence as usize + 1;
+        let next_prec = Precedence::from_index(next_rule)
+                            .expect("No match for given index");
+        self.parse_precedence(next_prec);
+
+        // Emit the operator instruction.
+        match tok.tpe {
+          TokenType::Plus  => self.emitter.emit_byte(OpCode::Add, line),
+          TokenType::Minus => self.emitter.emit_byte(OpCode::Subtract, line),
+          TokenType::Star  => self.emitter.emit_byte(OpCode::Multiply, line),
+          TokenType::Slash => self.emitter.emit_byte(OpCode::Divide, line),
+          _ => {}// Unreachable.
+        }
+      }
+
+    fn err(&mut self) {
+        self.error("Expect expression.");
+    }
+
+    pub fn error(&mut self, message: &str) {
+        self.error_at(self.previous.clone(), message);
+    }
 
     pub fn error_at_current(&mut self, message: &str) {
         self.error_at(self.current.clone(), message);
-
     }
 
     pub fn error_at(&mut self, token: Token, message: &str) {
@@ -109,7 +304,5 @@ impl Parser {
       
         eprint!( ": {}\n", message);
         self.had_error = true;
-      }
-      
-
+    }
 }

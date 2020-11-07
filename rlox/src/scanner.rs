@@ -244,7 +244,7 @@ impl Scanner {
     fn make_eof(&self) -> Token {
         Token {
             tpe:  TokenType::Eof,
-            text: String::from(&self.source[self.start..self.current-1]),
+            text: String::from(""),
             line: self.line
         }
     }
