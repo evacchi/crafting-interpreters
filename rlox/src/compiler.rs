@@ -80,8 +80,8 @@ impl Compiler {
         self.parser.end(self.parser.previous.line);
         !self.parser.had_error
     }
-    pub fn chunk(&self) -> Chunk {
-        self.parser.emitter.current_chunk.clone()
+    pub fn chunk(self) -> Chunk {
+        self.parser.emitter.current_chunk
     }
 }
 
