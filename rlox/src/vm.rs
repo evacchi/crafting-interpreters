@@ -37,13 +37,22 @@ impl VM {
         }
     }
 
-    fn binary_op (&mut self, op: fn(f64,f64) -> f64) {
+    fn binary_op(&mut self, op: fn(f64,f64) -> f64) {
         if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
             self.stack.pop();
             self.stack.pop();
             self.stack.push(Value::Number(op(a,b)))
         }
     }
+
+    fn bool_op(&mut self, op: fn(f64,f64) -> bool) {
+        if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
+            self.stack.pop();
+            self.stack.pop();
+            self.stack.push(Value::Bool(op(a,b)))
+        }
+    }
+
 
     fn run(&mut self) -> InterpretResult {
         loop {
@@ -56,8 +65,6 @@ impl VM {
               print!(" ]");
             }
             println!();
-
-
             
             self.chunk.disassemble_instruction(self.ip);
             match instruction {
@@ -68,6 +75,13 @@ impl VM {
                 OpCode::Nil      => self.stack.push(Value::Nil),
                 OpCode::True     => self.stack.push(Value::Bool(true)),
                 OpCode::False    => self.stack.push(Value::Bool(false)),
+                OpCode::Equal    => {
+                    let b = self.stack.pop().unwrap();
+                    let a = self.stack.pop().unwrap();
+                    self.stack.push(Value::Bool(a == b))
+                }
+                OpCode::Greater  => self.bool_op(|a, b| a > b),
+                OpCode::Less     => self.bool_op(|a, b| a < b),
                 OpCode::Add      => self.binary_op(|a, b| a + b),
                 OpCode::Subtract => self.binary_op(|a, b| a - b),
                 OpCode::Multiply => self.binary_op(|a, b| a * b),

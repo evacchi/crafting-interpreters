@@ -95,9 +95,16 @@ impl BytecodeEmitter {
             current_chunk : Chunk::new()
         }
     }
+
     pub fn emit_byte(&mut self, op: OpCode, line: usize) {
         self.current_chunk.write(op, line);
     }
+
+    pub fn emit_bytes(&mut self, op1: OpCode, op2: OpCode, line: usize) {
+        self.current_chunk.write(op1, line);
+        self.current_chunk.write(op2, line);
+    }
+
 
     pub fn emit_return(&mut self, line: usize) {
         self.emit_byte(OpCode::Return, line);
@@ -130,13 +137,13 @@ impl ParseRule {
             TokenType::Slash        => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
             TokenType::Star         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
             TokenType::Bang         => ParseRule::new(Parser::unary,    Parser::err,      Precedence::None),
-            TokenType::BangEqual    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::BangEqual    => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Equality),
             TokenType::Equal        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::EqualEqual   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::Greater      => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::GreaterEqual => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::Less         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::LessEqual    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::EqualEqual   => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
+            TokenType::Greater      => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
+            TokenType::GreaterEqual => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
+            TokenType::Less         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
+            TokenType::LessEqual    => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
             TokenType::Identifier   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::String       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Number       => ParseRule::new(Parser::number,   Parser::err,      Precedence::None),
@@ -268,10 +275,16 @@ impl Parser {
 
         // Emit the operator instruction.
         match tok.tpe {
-          TokenType::Plus  => self.emitter.emit_byte(OpCode::Add, line),
-          TokenType::Minus => self.emitter.emit_byte(OpCode::Subtract, line),
-          TokenType::Star  => self.emitter.emit_byte(OpCode::Multiply, line),
-          TokenType::Slash => self.emitter.emit_byte(OpCode::Divide, line),
+            TokenType::BangEqual    => self.emitter.emit_bytes(OpCode::Equal, OpCode::Not, line),
+            TokenType::EqualEqual   => self.emitter.emit_byte(OpCode::Equal, line),
+            TokenType::Greater      => self.emitter.emit_byte(OpCode::Greater, line),
+            TokenType::GreaterEqual => self.emitter.emit_bytes(OpCode::Less, OpCode::Not, line),
+            TokenType::Less         => self.emitter.emit_byte(OpCode::Less, line),
+            TokenType::LessEqual    => self.emitter.emit_bytes(OpCode::Greater, OpCode::Not, line),
+            TokenType::Plus         => self.emitter.emit_byte(OpCode::Add, line),
+            TokenType::Minus        => self.emitter.emit_byte(OpCode::Subtract, line),
+            TokenType::Star         => self.emitter.emit_byte(OpCode::Multiply, line),
+            TokenType::Slash        => self.emitter.emit_byte(OpCode::Divide, line),
           _ => {}// Unreachable.
         }
     }
