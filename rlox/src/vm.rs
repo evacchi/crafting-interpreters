@@ -28,7 +28,18 @@ impl VM {
         self.ip = 0;
         self.run()
     }
+    fn binary_op(&mut self, op: fn(f64,f64) -> f64) {
+        if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
+            self.stack.pop();
+            self.stack.pop();
+            self.stack.push(Value::Number(op(a,b)))
+        }
+    }
+
+
     fn run(&mut self) -> InterpretResult {
+
+
         loop {
             let instruction = self.chunk.fetch(self.ip);
 
@@ -39,6 +50,8 @@ impl VM {
               print!(" ]");
             }
             println!();
+
+
             
             self.chunk.disassemble_instruction(self.ip);
             match instruction {
@@ -46,29 +59,20 @@ impl VM {
                     let value = self.chunk.read_constant(index);
                     self.stack.push(value);
                 }
-                OpCode::Add => {
-                    let b = self.stack.pop().unwrap().0;
-                    let a = self.stack.pop().unwrap().0;
-                    self.stack.push(Value(a + b))
-                }
-                OpCode::Subtract => {
-                    let b = self.stack.pop().unwrap().0;
-                    let a = self.stack.pop().unwrap().0;
-                    self.stack.push(Value(a - b))
-                }
-                OpCode::Multiply => {
-                    let b = self.stack.pop().unwrap().0;
-                    let a = self.stack.pop().unwrap().0;
-                    self.stack.push(Value(a * b))
-                }
-                OpCode::Divide   => {
-                    let b = self.stack.pop().unwrap().0;
-                    let a = self.stack.pop().unwrap().0;
-                    self.stack.push(Value(a / b))
-                }                
-                OpCode::Negate => {
-                    let v = self.stack.pop().unwrap();
-                    self.stack.push(Value( -v.0 ));
+                OpCode::Nil      => self.stack.push(Value::Nil),
+                OpCode::True     => self.stack.push(Value::Bool(true)),
+                OpCode::False    => self.stack.push(Value::Bool(false)),
+                OpCode::Add      => self.binary_op(|a, b| a + b),
+                OpCode::Subtract => self.binary_op(|a, b| a - b),
+                OpCode::Multiply => self.binary_op(|a, b| a * b),
+                OpCode::Divide   => self.binary_op(|a, b| a / b),
+                OpCode::Negate   => {
+                    if let Value::Number(n) = self.stack.pop().unwrap() {
+                        self.stack.push(Value::Number( -n ));                        
+                    } else {
+                        self.runtime_error("Operand must be a number.");
+                        return InterpretResult::RuntimeError
+                    }
                 }
                 OpCode::Return => {
                     self.stack.pop().unwrap().print();
@@ -79,5 +83,14 @@ impl VM {
             self.ip += 1
         }
     }
+
+    fn runtime_error(&mut self, message: &str) {
+        eprintln!("{}", message);
+        let line = self.chunk.line_at(self.ip);
+        eprint!("[line {}] in script\n", line);
+      
+        self.stack.clear();
+      }
+      
     
 }

@@ -3,6 +3,9 @@ use value::Value;
 #[derive(Debug,Copy,Clone)]
 pub enum OpCode {
     Constant { index: usize },
+    Nil,
+    True,
+    False,
     Negate   ,
     Return   ,
     Add      ,
@@ -46,6 +49,10 @@ impl Chunk {
         self.code[ip]
     }
 
+    pub fn line_at(&self, ip: usize) -> usize {
+        self.lines[ip]
+    }
+
     pub fn disassemble(&self, name: &str) {
         println!("== {} ==", name);
     
@@ -66,6 +73,12 @@ impl Chunk {
         match op {
             OpCode::Constant { index } => 
                 self.constant_instruction("CONSTANT", index),
+            OpCode::Nil => 
+                self.simple_instruction("NIL"),
+            OpCode::True => 
+                self.simple_instruction("TRUE"),
+            OpCode::False => 
+              self.simple_instruction("FALSE"),
             OpCode::Add => 
                 self.simple_instruction("ADD"),
             OpCode::Subtract => 

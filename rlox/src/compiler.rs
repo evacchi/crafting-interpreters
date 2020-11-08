@@ -143,17 +143,17 @@ impl ParseRule {
             TokenType::And          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Class        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Else         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::False        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::False        => ParseRule::new(Parser::literal,  Parser::err,      Precedence::None),
             TokenType::For          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Fun          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::If           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::Nil          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Nil          => ParseRule::new(Parser::literal,  Parser::err,      Precedence::None),
             TokenType::Or           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Print        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Return       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Super        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::This         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::True         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::True         => ParseRule::new(Parser::literal,  Parser::err,      Precedence::None),
             TokenType::Var          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::While        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Error        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -211,7 +211,7 @@ impl Parser {
 
     pub fn number(&mut self) {
         let n = self.previous.text.parse::<f64>().unwrap();
-        self.emitter.emit_constant(Value(n), self.previous.line);
+        self.emitter.emit_constant(Value::Number(n), self.previous.line);
     }
 
     fn unary(&mut self) {
@@ -272,7 +272,17 @@ impl Parser {
           TokenType::Slash => self.emitter.emit_byte(OpCode::Divide, line),
           _ => {}// Unreachable.
         }
-      }
+    }
+
+    pub fn literal(&mut self) {
+        let tok = self.previous.clone();
+        match tok.tpe {
+            TokenType::False => self.emitter.emit_byte(OpCode::False, tok.line),
+            TokenType::Nil   => self.emitter.emit_byte(OpCode::Nil,   tok.line),
+            TokenType::True  => self.emitter.emit_byte(OpCode::True,  tok.line),
+            _ => {} // Unreachable.
+        }
+    }
 
     fn err(&mut self) {
         self.error("Expect expression.");

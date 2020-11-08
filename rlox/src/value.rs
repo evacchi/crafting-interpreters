@@ -1,8 +1,12 @@
 #[derive(Debug,Copy,Clone)]
-pub struct Value(pub f64);
+pub enum Value {
+    Nil,
+    Bool(bool),
+    Number(f64)
+}
 
 impl Value {
     pub fn print(&self) {
-        print!("{}", self.0);
+        print!("{:?}", self);
     }
 }
