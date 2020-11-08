@@ -2,4 +2,4 @@ all:
 	gcc *.c *.h 
 
 test: all
-	find ../test -type f -exec ./a.out '{}' \;
+	find ../test -type f -print -exec ./a.out '{}' \;
