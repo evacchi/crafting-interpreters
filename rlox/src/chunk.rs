@@ -47,7 +47,7 @@ impl Chunk {
     }
 
     pub fn disassemble(&self, name: &str) {
-        print!("== {} ==\n", name);
+        println!("== {} ==", name);
     
         for i in 0..self.code.len() {
             self.disassemble_instruction(i);
@@ -84,11 +84,11 @@ impl Chunk {
     fn constant_instruction(&self, op: &str, offset: &usize) {
         print!("{:16} {:4} '", op, offset);
         self.values[*offset].print();
-        print!("'\n");
+        println!("'");
     }
 
     fn simple_instruction(&self, op: &str) {
-        print!("{}\n", op)
+        println!("{}", op)
     }
 
 }

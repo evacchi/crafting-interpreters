@@ -43,7 +43,7 @@ fn repl(vm: &mut VM) {
     }
 }
 
-fn run_file(vm: &mut VM, f: &String) {
+fn run_file(vm: &mut VM, f: &str) {
     let source = fs::read_to_string(f)
                     .expect("Could not open file");
     match vm.interpret(&source) {

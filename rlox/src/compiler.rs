@@ -1,4 +1,3 @@
-use std::cmp::Eq;
 use std::cmp::PartialOrd;
 
 use chunk::Chunk;
@@ -222,9 +221,8 @@ impl Parser {
         self.parse_precedence(Precedence::Unary);
       
         // Emit the operator instruction.
-        match tok.tpe {
-          TokenType::Minus => self.emitter.emit_byte(OpCode::Negate, self.previous.line),
-          _ => {} // Unreachable.
+        if let TokenType::Minus = tok.tpe { 
+            self.emitter.emit_byte(OpCode::Negate, self.previous.line) 
         }
     }
       

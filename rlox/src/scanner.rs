@@ -82,9 +82,9 @@ impl Scanner {
         match self.chars.get(self.current) {
             Some(&c) if c == expected => {
                 self.current += 1;
-                return true
+                true
             }
-            _ => return false
+            _ => false
         }
     }
 
@@ -152,7 +152,7 @@ impl Scanner {
 
     fn check_keyword(&self, start: usize, length: usize, rest: &str, tpe: TokenType) -> TokenType {
         if self.current - self.start == start + length &&
-            String::from(& self.source[self.start + start .. self.start + start + length]) == String::from(rest) {
+            & self.source[self.start + start .. self.start + start + length] == rest {
             tpe
         } else {
             TokenType::Identifier
@@ -167,9 +167,9 @@ impl Scanner {
             'i' => self.check_keyword(1, 1, "f", TokenType::If),
             'f' if self.current - self.start > 1 => {
                 match self.chars[self.start + 1] {
-                        'a'=> return self.check_keyword(2, 3, "lse", TokenType::False),
-                        'o'=> return self.check_keyword(2, 1, "r", TokenType::For),
-                        'u'=> return self.check_keyword(2, 1, "n", TokenType::Fun),
+                        'a'=> self.check_keyword(2, 3, "lse", TokenType::False),
+                        'o'=> self.check_keyword(2, 1, "r", TokenType::For),
+                        'u'=> self.check_keyword(2, 1, "n", TokenType::Fun),
                         _ => TokenType::Identifier
                     }
                 }
@@ -180,8 +180,8 @@ impl Scanner {
             's' => self.check_keyword(1, 4, "uper", TokenType::Super),
             't' if self.current - self.start > 1 => {
                 match self.chars[self.start + 1] {
-                        'h'=> return self.check_keyword(2, 2, "is", TokenType::This),
-                        'r'=> return self.check_keyword(2, 2, "ue", TokenType::True),
+                        'h'=> self.check_keyword(2, 2, "is", TokenType::This),
+                        'r'=> self.check_keyword(2, 2, "ue", TokenType::True),
                         _ => TokenType::Identifier
                     }
                 }
@@ -220,7 +220,7 @@ impl Scanner {
             }
         }
 
-        return self.make_token(TokenType::Number);
+        self.make_token(TokenType::Number)
       }
 
     fn string(&mut self) -> Token {
@@ -238,7 +238,7 @@ impl Scanner {
 
         // The closing quote.
         self.advance();
-        return self.make_token(TokenType::String);
+        self.make_token(TokenType::String)
     }
 
     fn make_eof(&self) -> Token {

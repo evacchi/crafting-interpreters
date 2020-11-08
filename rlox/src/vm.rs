@@ -19,14 +19,14 @@ impl VM {
     pub fn new() -> VM {
         VM { chunk: Chunk::new(), ip: 0, stack: Vec::new() }
     }
-    pub fn interpret(&mut self, source: &String) -> InterpretResult {
+    pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
         if !compiler.compile() {
             return InterpretResult::CompileError;
         }
         self.chunk = compiler.chunk();
         self.ip = 0;
-        return self.run();
+        self.run()
     }
     fn run(&mut self) -> InterpretResult {
         loop {
@@ -38,7 +38,7 @@ impl VM {
               slot.print();
               print!(" ]");
             }
-            print!("\n");
+            println!();
             
             self.chunk.disassemble_instruction(self.ip);
             match instruction {
@@ -72,7 +72,7 @@ impl VM {
                 }
                 OpCode::Return => {
                     self.stack.pop().unwrap().print();
-                    print!("\n");
+                    println!();
                     return InterpretResult::Ok
                 }
             }
