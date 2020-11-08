@@ -12,6 +12,7 @@ pub enum OpCode {
     Subtract ,
     Multiply ,
     Divide   ,
+    Not,
 }
 
 #[derive(Clone)]
@@ -87,6 +88,8 @@ impl Chunk {
                 self.simple_instruction("MULTIPLY"),
             OpCode::Divide => 
                 self.simple_instruction("DIVIDE"),
+            OpCode::Not => 
+                self.simple_instruction("NOT"),
             OpCode::Negate =>
                 self.simple_instruction("NEGATE"),
             OpCode::Return => 

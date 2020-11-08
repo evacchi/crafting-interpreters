@@ -129,7 +129,7 @@ impl ParseRule {
             TokenType::Semicolon    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Slash        => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
             TokenType::Star         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Factor),
-            TokenType::Bang         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Bang         => ParseRule::new(Parser::unary,    Parser::err,      Precedence::None),
             TokenType::BangEqual    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Equal        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::EqualEqual   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -221,8 +221,10 @@ impl Parser {
         self.parse_precedence(Precedence::Unary);
       
         // Emit the operator instruction.
-        if let TokenType::Minus = tok.tpe { 
-            self.emitter.emit_byte(OpCode::Negate, self.previous.line) 
+        match tok.tpe { 
+            TokenType::Bang => self.emitter.emit_byte(OpCode::Not, self.previous.line),
+            TokenType::Minus => self.emitter.emit_byte(OpCode::Negate, self.previous.line),
+            _ => {} // Unreachable.
         }
     }
       

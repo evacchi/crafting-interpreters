@@ -28,7 +28,16 @@ impl VM {
         self.ip = 0;
         self.run()
     }
-    fn binary_op(&mut self, op: fn(f64,f64) -> f64) {
+
+    fn is_falsey(&self, value: Value) -> bool {
+        match value {
+            Value::Nil => true,
+            Value::Bool(b) => b,
+            Value::Number(_) => false
+        }
+    }
+
+    fn binary_op (&mut self, op: fn(f64,f64) -> f64) {
         if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
             self.stack.pop();
             self.stack.pop();
@@ -36,10 +45,7 @@ impl VM {
         }
     }
 
-
     fn run(&mut self) -> InterpretResult {
-
-
         loop {
             let instruction = self.chunk.fetch(self.ip);
 
@@ -66,6 +72,10 @@ impl VM {
                 OpCode::Subtract => self.binary_op(|a, b| a - b),
                 OpCode::Multiply => self.binary_op(|a, b| a * b),
                 OpCode::Divide   => self.binary_op(|a, b| a / b),
+                OpCode::Not      => {
+                    let v = self.stack.pop().unwrap();
+                    self.stack.push(Value::Bool(self.is_falsey(v)))
+                }
                 OpCode::Negate   => {
                     if let Value::Number(n) = self.stack.pop().unwrap() {
                         self.stack.push(Value::Number( -n ));                        
