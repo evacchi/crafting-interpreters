@@ -3,6 +3,8 @@ use std::cmp::PartialOrd;
 use chunk::Chunk;
 use chunk::OpCode;
 
+use object::ObjType;
+
 use scanner::Scanner;
 use scanner::Token;
 use scanner::TokenType;
@@ -145,7 +147,7 @@ impl ParseRule {
             TokenType::Less         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
             TokenType::LessEqual    => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
             TokenType::Identifier   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::String       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::String       => ParseRule::new(Parser::string,   Parser::err,      Precedence::None),
             TokenType::Number       => ParseRule::new(Parser::number,   Parser::err,      Precedence::None),
             TokenType::And          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Class        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -220,6 +222,10 @@ impl Parser {
         let n = self.previous.text.parse::<f64>().unwrap();
         self.emitter.emit_constant(Value::Number(n), self.previous.line);
     }
+
+    fn string(&mut self) {
+        self.emitter.emit_constant(Value::Object(ObjType::String(self.previous.text.clone())), self.previous.line);
+      }
 
     fn unary(&mut self) {
         let tok = self.previous.clone();
