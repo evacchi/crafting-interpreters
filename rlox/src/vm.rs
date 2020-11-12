@@ -1,6 +1,7 @@
 use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Compiler;
+use object::ObjType;
 use value::Value;
 
 pub struct VM {
@@ -82,7 +83,30 @@ impl VM {
                 }
                 OpCode::Greater  => self.bool_op(|a, b| a > b),
                 OpCode::Less     => self.bool_op(|a, b| a < b),
-                OpCode::Add      => self.binary_op(|a, b| a + b),
+                OpCode::Add      =>{
+                    match (self.stack.last().unwrap().clone(), self.stack.get(self.stack.len()-2).unwrap().clone()) {
+                        (Value::Object(ObjType::String(a)), Value::Object(ObjType::String(b))) => {
+                            self.stack.pop();
+                            self.stack.pop();
+
+                            let owned = format!("{}{}", a, b);
+                            
+                            self.stack.push(Value::Object(ObjType::String(owned)));
+                            
+                        }
+                        (Value::Number(b), Value::Number(a)) => {
+                            self.stack.pop();
+                            self.stack.pop();
+                            self.stack.push(Value::Number(a + b))
+                        }
+                        _ => {
+                            self.runtime_error(
+                                "Operands must be two numbers or two strings.");
+                            return InterpretResult::RuntimeError;
+                        }
+
+                    }
+                }
                 OpCode::Subtract => self.binary_op(|a, b| a - b),
                 OpCode::Multiply => self.binary_op(|a, b| a * b),
                 OpCode::Divide   => self.binary_op(|a, b| a / b),
