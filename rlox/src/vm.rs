@@ -33,7 +33,7 @@ impl VM {
         match value {
             Value::Nil => true,
             Value::Bool(b) => b,
-            Value::Number(_) => false
+            _ => false
         }
     }
 

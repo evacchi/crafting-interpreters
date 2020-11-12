@@ -41,7 +41,7 @@ impl Chunk {
     }
 
     pub fn read_constant(&self, offset: usize) -> Value {
-        self.values[offset]
+        self.values[offset].clone()
     }
 
     pub fn write(&mut self, op: OpCode, line: usize) {

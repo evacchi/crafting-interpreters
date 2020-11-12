@@ -1,8 +1,11 @@
-#[derive(Debug,Copy,Clone,PartialEq)]
+use object::ObjType;
+
+#[derive(Debug,Clone,PartialEq)]
 pub enum Value {
     Nil,
     Bool(bool),
-    Number(f64)
+    Number(f64),
+    Object(ObjType)
 }
 
 impl Value {
