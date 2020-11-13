@@ -1,6 +1,9 @@
+use std::rc::Rc;
+
 use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Compiler;
+use memory::Memory;
 use object::ObjType;
 use value::Value;
 
@@ -8,6 +11,7 @@ pub struct VM {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    memory: Memory
 }
 
 pub enum InterpretResult {
@@ -18,14 +22,16 @@ pub enum InterpretResult {
 
 impl VM {
     pub fn new() -> VM {
-        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new() }
+        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new(), memory: Memory::new() }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
         if !compiler.compile() {
             return InterpretResult::CompileError;
         }
-        self.chunk = compiler.chunk();
+        let (chk, mem) = compiler.state();
+        self.chunk = chk;
+        self.memory = mem;
         self.ip = 0;
         self.run()
     }
@@ -85,14 +91,18 @@ impl VM {
                 OpCode::Less     => self.bool_op(|a, b| a < b),
                 OpCode::Add      =>{
                     match (self.stack.last().unwrap().clone(), self.stack.get(self.stack.len()-2).unwrap().clone()) {
-                        (Value::Object(ObjType::String(a)), Value::Object(ObjType::String(b))) => {
-                            self.stack.pop();
-                            self.stack.pop();
+                        (Value::Object(aref), Value::Object(bref)) => {
+                            match (&*aref, &*bref) {
+                                (ObjType::String(a), ObjType::String(b)) => {
 
-                            let owned = format!("{}{}", a, b);
-                            
-                            self.stack.push(Value::Object(ObjType::String(owned)));
-                            
+                                    self.stack.pop();
+                                    self.stack.pop();
+        
+                                    let owned = format!("{}{}", a, b);
+                                    
+                                    self.stack.push(Value::Object(Rc::new(ObjType::String(owned))));
+                                }
+                            }
                         }
                         (Value::Number(b), Value::Number(a)) => {
                             self.stack.pop();

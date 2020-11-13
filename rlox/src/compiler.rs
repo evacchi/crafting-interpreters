@@ -1,8 +1,10 @@
 use std::cmp::PartialOrd;
+use std::rc::Rc;
 
 use chunk::Chunk;
 use chunk::OpCode;
 
+use memory::Memory;
 use object::ObjType;
 
 use scanner::Scanner;
@@ -82,19 +84,21 @@ impl Compiler {
         self.parser.end(self.parser.previous.line);
         !self.parser.had_error
     }
-    pub fn chunk(self) -> Chunk {
-        self.parser.emitter.current_chunk
+    pub fn state(self) -> (Chunk, Memory) {
+        (self.parser.emitter.current_chunk, self.parser.emitter.memory)
     }
 }
 
 struct BytecodeEmitter {
-    current_chunk: Chunk
+    current_chunk: Chunk,
+    memory: Memory
 }
 
 impl BytecodeEmitter {
     pub fn new() -> BytecodeEmitter { 
         BytecodeEmitter {
-            current_chunk : Chunk::new()
+            current_chunk : Chunk::new(),
+            memory : Memory::new()
         }
     }
 
@@ -112,6 +116,10 @@ impl BytecodeEmitter {
         self.emit_byte(OpCode::Return, line);
     }
     pub fn emit_constant(&mut self, value: Value, line: usize) {
+        if let Value::Object(o) = &value {
+            self.memory.push(o.clone());
+        }
+
         let index = self.current_chunk.write_constant(value);
         self.emit_byte(OpCode::Constant{ index }, line);
     }
@@ -224,8 +232,9 @@ impl Parser {
     }
 
     fn string(&mut self) {
-        self.emitter.emit_constant(Value::Object(ObjType::String(self.previous.text.clone())), self.previous.line);
-      }
+        let value = Value::Object(Rc::new(ObjType::String(self.previous.text.clone())));
+        self.emitter.emit_constant(value, self.previous.line);
+    }
 
     fn unary(&mut self) {
         let tok = self.previous.clone();
