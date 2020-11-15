@@ -83,6 +83,12 @@ impl VM {
                 OpCode::True     => self.stack.push(Value::Bool(true)),
                 OpCode::False    => self.stack.push(Value::Bool(false)),
                 OpCode::Pop      => { self.stack.pop(); }
+                OpCode::DefineGlobal { index } => {
+                    let value = self.chunk.read_constant(index);
+                    if let Value::Object(ObjType::String(s)) = value {
+                        self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone());
+                    }
+                }
                 OpCode::Equal    => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();

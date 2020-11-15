@@ -118,13 +118,14 @@ impl BytecodeEmitter {
     pub fn emit_return(&mut self, line: usize) {
         self.emit_byte(OpCode::Return, line);
     }
-    pub fn emit_constant(&mut self, value: Value, line: usize) {
+    pub fn emit_constant(&mut self, value: Value, line: usize) -> usize {
         if let Value::Object(o) = &value {
             self.memory.push(o.clone());
         }
 
         let index = self.current_chunk.write_constant(value);
         self.emit_byte(OpCode::Constant{ index }, line);
+        index
     }
 
 }
@@ -278,9 +279,40 @@ impl Parser {
         
     }
 
+    fn identifier_constant(&mut self, name: &Token) -> usize {
+        self.emitter.emit_constant(Value::Object(ObjType::String(Rc::new(name.text.clone()))), self.current.line)
+    }
+      
+
+    fn parse_variable(&mut self, err: &str) -> usize {
+        self.consume(TokenType::Identifier, err);
+        self.identifier_constant(&self.previous.clone())
+    }
+
+    fn define_variable(&mut self, index: usize) {
+        self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
+      }
+      
+      
+
     pub fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
     }
+
+    fn var_declaration(&mut self) {
+        let global = self.parse_variable("Expect variable name.");
+      
+        if self.matches(TokenType::Equal) {
+          self.expression();
+        } else {
+          self.emitter.emit_byte(OpCode::Nil, self.current.line);
+        }
+        self.consume(TokenType::Semicolon,
+                "Expect ';' after variable declaration.");
+      
+        self.define_variable(global);
+      }
+      
 
     fn expression_statement(&mut self) {
         self.expression();
@@ -319,7 +351,12 @@ impl Parser {
     }
 
     pub fn declaration(&mut self) {
-        self.statement();
+        if self.matches(TokenType::Var) {
+            self.var_declaration();
+        } else {
+            self.statement();
+        }
+    
         if self.panic_mode {
             self.synchronize();
         }
