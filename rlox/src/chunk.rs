@@ -6,6 +6,7 @@ pub enum OpCode {
     Nil,
     True,
     False,
+    Pop,
     Equal,
     Greater,
     Less,
@@ -84,6 +85,8 @@ impl Chunk {
                 self.simple_instruction("TRUE"),
             OpCode::False => 
                 self.simple_instruction("FALSE"),
+            OpCode::Pop =>
+                self.simple_instruction("POP"),
             OpCode::Equal =>
                 self.simple_instruction("EQUAL"),
             OpCode::Greater =>

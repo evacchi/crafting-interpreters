@@ -282,19 +282,54 @@ impl Parser {
         self.parse_precedence(Precedence::Assignment)
     }
 
+    fn expression_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after expression.");
+        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+      }
+      
+
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
         self.emitter.emit_byte(OpCode::Print, self.current.line);
     }
 
+    fn synchronize(&mut self) {
+        self.panic_mode = true;
+        
+        while self.current.tpe != TokenType::Eof {
+            if self.previous.tpe == TokenType::Semicolon {
+                return;
+            }
+            match self.current.tpe {
+                TokenType::Class
+                | TokenType::Fun
+                | TokenType::Var
+                | TokenType::For
+                | TokenType::If
+                | TokenType::While
+                | TokenType::Print
+                | TokenType::Return => { return; }
+                _ => {}
+            }
+
+            self.advance();
+        }
+    }
+
     pub fn declaration(&mut self) {
-        self.statement()
+        self.statement();
+        if self.panic_mode {
+            self.synchronize();
+        }
     }
 
     pub fn statement(&mut self) {
         if self.matches(TokenType::Print) {
             self.print_statement();
+        } else {
+            self.expression_statement();
         }
     }
 
