@@ -4,7 +4,7 @@ use std::collections::HashSet;
 use object::ObjType;
 
 pub struct Memory {
-    objects: Vec<Rc<ObjType>>,
+    objects: Vec<ObjType>,
     strings: HashSet<Rc<String>>,
 }
 
@@ -15,16 +15,20 @@ impl Memory {
             strings: HashSet::new()
         }
     }
-    pub fn push(&mut self, obj: Rc<ObjType>) {
-        self.objects.push(obj);
+    pub fn push(&mut self, obj: ObjType) {
+        self.objects.push(obj.clone());
+        match obj {
+            ObjType::String(r) =>  { self.intern(r); }
+        }
     }
     pub fn intern(&mut self, obj: Rc<String>) -> Rc<String> {
         match self.strings.get(&obj) {
             None => {
-                self.strings.insert(obj.clone());
+                let item = obj.clone();
+                self.strings.insert(item);
                 obj
-            } 
-            Some(&v) => v
+            }
+            Some(e) => e.clone(),
         }
     }
 }

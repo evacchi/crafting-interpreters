@@ -232,7 +232,7 @@ impl Parser {
     }
 
     fn string(&mut self) {
-        let value = Value::Object(Rc::new(ObjType::String(self.previous.text.clone())));
+        let value = Value::Object(ObjType::String(Rc::new(self.previous.text.clone())));
         self.emitter.emit_constant(value, self.previous.line);
     }
 

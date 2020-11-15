@@ -94,7 +94,7 @@ impl VM {
                 OpCode::Add      =>{
                     match (self.stack.last().unwrap().clone(), self.stack.get(self.stack.len()-2).unwrap().clone()) {
                         (Value::Object(aref), Value::Object(bref)) => {
-                            match (&*aref, &*bref) {
+                            match (aref, bref) {
                                 (ObjType::String(a), ObjType::String(b)) => {
 
                                     self.stack.pop();
@@ -102,7 +102,7 @@ impl VM {
         
                                     let owned = format!("{}{}", a, b);
                                     
-                                    self.stack.push(Value::Object(Rc::new(ObjType::String(owned))));
+                                    self.stack.push(Value::Object(ObjType::String(Rc::new(owned))));
                                 }
                             }
                         }
