@@ -1,5 +1,4 @@
 use std::rc::Rc;
-use std::collections::HashSet;
 
 use chunk::Chunk;
 use chunk::OpCode;
@@ -13,7 +12,6 @@ pub struct VM {
     ip: usize,
     stack: Vec<Value>,
     memory: Memory,
-    strings: HashSet<Rc<ObjType>>
 }
 
 pub enum InterpretResult {
@@ -24,7 +22,7 @@ pub enum InterpretResult {
 
 impl VM {
     pub fn new() -> VM {
-        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new(), memory: Memory::new(), strings: HashSet::new() }
+        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new(), memory: Memory::new() }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
@@ -134,9 +132,12 @@ impl VM {
                         return InterpretResult::RuntimeError
                     }
                 }
-                OpCode::Return => {
+                OpCode::Print => {
                     self.stack.pop().unwrap().print();
                     println!();
+                }
+                OpCode::Return => {
+                    // Exit interpreter.
                     return InterpretResult::Ok
                 }
             }

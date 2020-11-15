@@ -10,6 +10,7 @@ pub enum OpCode {
     Greater,
     Less,
     Negate   ,
+    Print   ,
     Return   ,
     Add      ,
     Subtract ,
@@ -101,6 +102,8 @@ impl Chunk {
                 self.simple_instruction("NOT"),
             OpCode::Negate =>
                 self.simple_instruction("NEGATE"),
+            OpCode::Print => 
+                self.simple_instruction("PRINT"),
             OpCode::Return => 
                 self.simple_instruction("RETURN"),
         }

@@ -79,8 +79,11 @@ impl Compiler {
     }
     pub fn compile(&mut self) -> bool {
         self.parser.advance();
-        self.parser.expression();
-        self.parser.consume(TokenType::Eof, "Expect end of expression.");
+
+        while !self.parser.matches(TokenType::Eof) {
+            self.parser.declaration();
+        }
+
         self.parser.end(self.parser.previous.line);
         !self.parser.had_error
     }
@@ -220,6 +223,18 @@ impl Parser {
         self.error_at_current(message);
     }
 
+    fn matches(&mut self, tpe: TokenType) -> bool {
+        if !self.check(tpe) {
+            false
+        } else {
+            self.advance();
+            true
+        }
+    }
+
+    fn check(&mut self, tpe: TokenType) -> bool {
+        self.current.tpe == tpe
+    }
 
     fn grouping(&mut self) {
         self.expression();
@@ -266,7 +281,22 @@ impl Parser {
     pub fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
     }
-    
+
+    fn print_statement(&mut self) {
+        self.expression();
+        self.consume(TokenType::Semicolon, "Expect ';' after value.");
+        self.emitter.emit_byte(OpCode::Print, self.current.line);
+    }
+
+    pub fn declaration(&mut self) {
+        self.statement()
+    }
+
+    pub fn statement(&mut self) {
+        if self.matches(TokenType::Print) {
+            self.print_statement();
+        }
+    }
 
     pub fn end(&mut self, line: usize) {
         self.emitter.emit_return(line);
