@@ -7,6 +7,7 @@ pub enum OpCode {
     True,
     False,
     Pop,
+    GetGlobal { index: usize },
     DefineGlobal { index: usize },
     Equal,
     Greater,
@@ -88,6 +89,8 @@ impl Chunk {
                 self.simple_instruction("FALSE"),
             OpCode::Pop =>
                 self.simple_instruction("POP"),
+            OpCode::GetGlobal { index } =>
+                self.constant_instruction("GET_GLOBAL", index),
             OpCode::DefineGlobal { index } =>
                 self.constant_instruction("DEFINE_GLOBAL", index),
             OpCode::Equal =>

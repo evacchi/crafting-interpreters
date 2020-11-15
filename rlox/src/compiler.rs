@@ -158,7 +158,7 @@ impl ParseRule {
             TokenType::GreaterEqual => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
             TokenType::Less         => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
             TokenType::LessEqual    => ParseRule::new(Parser::err,      Parser::binary,   Precedence::Comparison),
-            TokenType::Identifier   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Identifier   => ParseRule::new(Parser::variable, Parser::err,      Precedence::None),
             TokenType::String       => ParseRule::new(Parser::string,   Parser::err,      Precedence::None),
             TokenType::Number       => ParseRule::new(Parser::number,   Parser::err,      Precedence::None),
             TokenType::And          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -252,6 +252,16 @@ impl Parser {
         self.emitter.emit_constant(value, self.previous.line);
     }
 
+    fn named_variable(&mut self, name: &Token) {
+        let index = self.identifier_constant(&name);
+        self.emitter.emit_byte(OpCode::GetGlobal { index }, name.line);
+      }
+      
+
+    fn variable(&mut self) {
+        self.named_variable(&self.previous.clone())
+    }
+
     fn unary(&mut self) {
         let tok = self.previous.clone();
       
@@ -291,9 +301,7 @@ impl Parser {
 
     fn define_variable(&mut self, index: usize) {
         self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
-      }
-      
-      
+    }      
 
     pub fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)

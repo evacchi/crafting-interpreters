@@ -83,10 +83,30 @@ impl VM {
                 OpCode::True     => self.stack.push(Value::Bool(true)),
                 OpCode::False    => self.stack.push(Value::Bool(false)),
                 OpCode::Pop      => { self.stack.pop(); }
+                OpCode::GetGlobal { index } => {
+                    let value = self.chunk.read_constant(index);
+                    self.stack.pop();
+
+                    if let Value::Object(ObjType::String(s)) = value {
+                        let k = s.to_string();
+                        match self.memory.get_global(k) {
+                            None => {
+                                let ss = format!("Undefined variable '{}'.", s);
+                                self.runtime_error(&ss);
+                                return InterpretResult::RuntimeError;
+                            }
+                            Some(v) => 
+                                self.stack.push(v.clone())
+                        }
+                    }
+                }
                 OpCode::DefineGlobal { index } => {
                     let value = self.chunk.read_constant(index);
+
                     if let Value::Object(ObjType::String(s)) = value {
                         self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone());
+                        self.stack.pop();
+                        self.stack.pop();
                     }
                 }
                 OpCode::Equal    => {
