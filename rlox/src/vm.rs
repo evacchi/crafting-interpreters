@@ -3,6 +3,7 @@ use std::rc::Rc;
 use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Compiler;
+use compiler::BytecodeEmitter;
 use memory::Memory;
 use object::ObjType;
 use value::Value;
@@ -29,9 +30,9 @@ impl VM {
         if !compiler.compile() {
             return InterpretResult::CompileError;
         }
-        let (chk, mem) = compiler.state();
-        self.chunk = chk;
-        self.memory = mem;
+        let BytecodeEmitter{ mut current_chunk, mut memory } = compiler.state();
+        self.chunk.read_all(&mut current_chunk);
+        self.memory.read_all(&mut memory);
         self.ip = 0;
         self.run()
     }

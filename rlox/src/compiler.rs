@@ -87,14 +87,14 @@ impl Compiler {
         self.parser.end(self.parser.previous.line);
         !self.parser.had_error
     }
-    pub fn state(self) -> (Chunk, Memory) {
-        (self.parser.emitter.current_chunk, self.parser.emitter.memory)
+    pub fn state(self) -> BytecodeEmitter {
+        self.parser.emitter
     }
 }
 
-struct BytecodeEmitter {
-    current_chunk: Chunk,
-    memory: Memory
+pub struct BytecodeEmitter {
+    pub current_chunk: Chunk,
+    pub memory: Memory
 }
 
 impl BytecodeEmitter {

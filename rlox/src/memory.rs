@@ -19,6 +19,18 @@ impl Memory {
             strings: HashSet::new()
         }
     }
+
+    pub fn read_all(&mut self, mem: &mut Memory) {
+        self.objects.append(&mut mem.objects);
+        for (key, val) in mem.globals.iter() {
+            self.globals.insert(key.to_string(), val.clone());
+        }
+        for val in mem.strings.iter() {
+            self.strings.insert(val.clone());
+        }
+    }
+
+
     pub fn set_global(&mut self, s: String, value: Value) -> bool {
         let r = self.globals.insert(s, value);
         r.is_none() // return true if key is new

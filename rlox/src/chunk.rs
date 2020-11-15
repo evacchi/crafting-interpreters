@@ -39,6 +39,12 @@ impl Chunk {
         }
     }
 
+    pub fn read_all(&mut self, chunk: &mut Chunk) {
+        self.code.append(&mut chunk.code);
+        self.values.append(&mut chunk.values);
+        self.lines.append(&mut chunk.lines);
+    }
+
     pub fn write_constant(&mut self, value: Value) -> usize {
         let idx = self.values.len();
         self.values.push(value);
