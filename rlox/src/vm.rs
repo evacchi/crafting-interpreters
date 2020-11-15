@@ -107,6 +107,19 @@ impl VM {
                         self.stack.pop();
                     }
                 }
+                OpCode::SetGlobal { index } => {
+                    let value = self.chunk.read_constant(index);
+
+                    if let Value::Object(ObjType::String(s)) = value {
+                        if self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone()) {
+                            self.memory.delete_global(s.to_string());
+                            let ss = format!("Undefined variable '{}'.", s);
+                            self.runtime_error(&ss);
+                            return InterpretResult::RuntimeError;
+                        }
+                        self.stack.pop();
+                    }
+                }
                 OpCode::Equal    => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();

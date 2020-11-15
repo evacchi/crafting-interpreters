@@ -19,13 +19,19 @@ impl Memory {
             strings: HashSet::new()
         }
     }
-    pub fn set_global(&mut self, s: String, value: Value) {
-        self.globals.insert(s, value);
+    pub fn set_global(&mut self, s: String, value: Value) -> bool {
+        let r = self.globals.insert(s, value);
+        r.is_none() // return true if key is new
     }
 
     pub fn get_global(&mut self, s: String) -> Option<&Value> {
         self.globals.get(&s)
     }
+
+    pub fn delete_global(&mut self, s: String) {
+        self.globals.remove(&s);
+    }
+    
     pub fn push(&mut self, obj: ObjType) {
         self.objects.push(obj.clone());
         match obj {
