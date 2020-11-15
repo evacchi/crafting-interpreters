@@ -85,7 +85,6 @@ impl VM {
                 OpCode::Pop      => { self.stack.pop(); }
                 OpCode::GetGlobal { index } => {
                     let value = self.chunk.read_constant(index);
-                    self.stack.pop();
 
                     if let Value::Object(ObjType::String(s)) = value {
                         let k = s.to_string();
@@ -105,7 +104,6 @@ impl VM {
 
                     if let Value::Object(ObjType::String(s)) = value {
                         self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone());
-                        self.stack.pop();
                         self.stack.pop();
                     }
                 }

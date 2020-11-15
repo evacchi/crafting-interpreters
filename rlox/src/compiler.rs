@@ -118,6 +118,11 @@ impl BytecodeEmitter {
     pub fn emit_return(&mut self, line: usize) {
         self.emit_byte(OpCode::Return, line);
     }
+
+    pub fn write_constant(&mut self, value: Value) -> usize {
+        self.current_chunk.write_constant(value)
+    }
+
     pub fn emit_constant(&mut self, value: Value, line: usize) -> usize {
         if let Value::Object(o) = &value {
             self.memory.push(o.clone());
@@ -290,7 +295,7 @@ impl Parser {
     }
 
     fn identifier_constant(&mut self, name: &Token) -> usize {
-        self.emitter.emit_constant(Value::Object(ObjType::String(Rc::new(name.text.clone()))), self.current.line)
+        self.emitter.write_constant(Value::Object(ObjType::String(Rc::new(name.text.clone()))))
     }
       
 
@@ -311,9 +316,9 @@ impl Parser {
         let global = self.parse_variable("Expect variable name.");
       
         if self.matches(TokenType::Equal) {
-          self.expression();
+            self.expression();
         } else {
-          self.emitter.emit_byte(OpCode::Nil, self.current.line);
+            self.emitter.emit_byte(OpCode::Nil, self.current.line);
         }
         self.consume(TokenType::Semicolon,
                 "Expect ';' after variable declaration.");

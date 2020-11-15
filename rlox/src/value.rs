@@ -10,6 +10,12 @@ pub enum Value {
 
 impl Value {
     pub fn print(&self) {
-        print!("{:?}", self);
+        let s = match self {
+            Value::Nil => String::from("nil"),
+            Value::Bool(b) => format!("{}", b),
+            Value::Number(n) => format!("{}", n),
+            Value::Object(ObjType::String(s)) => format!("{:?}", s),
+        };
+        print!("{}", s);
     }
 }
