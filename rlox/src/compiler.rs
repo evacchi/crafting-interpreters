@@ -64,17 +64,60 @@ struct Parser {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    emitter: BytecodeEmitter
+    emitter: BytecodeEmitter,
+    scope: Scope
+}
+
+struct Local {
+    name: Token,
+    depth: i32
+}
+
+struct Scope {
+    locals: Vec<Local>,
+    depth: i32
 }
 
 pub struct Compiler {
     parser: Parser,
 }
 
+impl Scope {
+    fn new() -> Scope {
+        Scope {
+            locals: Vec::new(),
+            depth: 0,        
+        }
+    }
+
+    fn begin(&mut self) {
+        self.depth += 1;
+    }
+
+    fn end(&mut self) -> i32 {
+        let mut count = 0;
+        while self.locals.len() > 0 &&
+              self.locals.last().unwrap().depth > self.depth {
+            count += 1;
+        }
+        self.depth -= 1;
+        count
+    }
+
+    fn add_local(&mut self, name: Token) {
+        let local = Local {
+            name,
+            depth: self.depth
+        };
+        self.locals.push(local);
+    }
+}
+
+
 impl Compiler {
     pub fn new(source: String) -> Compiler {
         Compiler {
-            parser: Parser::new(source)
+            parser: Parser::new(source),
         }
     }
     pub fn compile(&mut self) -> bool {
@@ -204,7 +247,8 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
-            emitter: BytecodeEmitter::new()
+            emitter: BytecodeEmitter::new(),
+            scope: Scope::new()
 
         }
     }
@@ -297,19 +341,55 @@ impl Parser {
     fn identifier_constant(&mut self, name: &Token) -> usize {
         self.emitter.write_constant(Value::Object(ObjType::String(Rc::new(name.text.clone()))))
     }
+
+    fn declare_variable(&mut self) {
+        if self.scope.depth == 0 { return; }
+        let name = self.previous.clone();
+        let iter = &self.scope.locals;
+        for local in iter.iter().rev() {
+            if local.depth != -1 && local.depth < self.scope.depth {
+                break;
+            }
+
+            if name.text == local.name.text {
+                panic!("Already variable with this name in this scope.");
+            }
+
+        }
+
+        self.scope.add_local(name);
+    }
       
 
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::Identifier, err);
+
+        self.declare_variable();
+        if self.scope.depth > 0 {
+            return 0;
+        }
+
         self.identifier_constant(&self.previous.clone())
     }
 
     fn define_variable(&mut self, index: usize) {
+        if self.scope.depth > 0 {
+            return;
+        }
+
         self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
     }      
 
     pub fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
+    }
+
+    fn block(&mut self) {
+        while ! self.check(TokenType::RightBrace) && !self.check(TokenType::Eof) {
+            self.declaration();
+        }
+
+        self.consume(TokenType::RightBrace, "Expect '}' after block.");
     }
 
     fn var_declaration(&mut self) {
@@ -378,6 +458,12 @@ impl Parser {
     pub fn statement(&mut self) {
         if self.matches(TokenType::Print) {
             self.print_statement();
+        } else if self.matches(TokenType::LeftBrace) {
+            self.scope.begin();
+            self.block();
+            for _ in 0..self.scope.end() {
+                self.emitter.emit_byte(OpCode::Pop, self.current.line);
+            }
         } else {
             self.expression_statement();
         }
