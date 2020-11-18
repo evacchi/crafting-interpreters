@@ -107,6 +107,17 @@ impl VM {
                         self.stack.pop();
                     }
                 }
+                OpCode::SetGlobal { index } => {
+                    let value = self.chunk.read_constant(index);
+
+                    if let Value::Object(ObjType::String(s)) = value {
+                        if self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone()) {
+                            self.memory.delete_global(s.to_string());
+                            self.runtime_error(&format!("Undefined variable '{}'.", s));
+                            return InterpretResult::RuntimeError;
+                        }
+                    }
+                }
                 OpCode::Equal    => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
@@ -116,7 +127,7 @@ impl VM {
                 OpCode::Less     => self.bool_op(|a, b| a < b),
                 OpCode::Add      =>{
                     match (self.stack.last().unwrap().clone(), self.stack.get(self.stack.len()-2).unwrap().clone()) {
-                        (Value::Object(aref), Value::Object(bref)) => {
+                        (Value::Object(bref), Value::Object(aref)) => {
                             match (aref, bref) {
                                 (ObjType::String(a), ObjType::String(b)) => {
 

@@ -48,9 +48,9 @@ impl Precedence {
 }
 
 
-type BinaryRule = fn(&mut Parser) -> ();
+type BinaryRule = fn(&mut Parser, bool) -> ();
 
-type UnaryRule = fn(&mut Parser) -> ();
+type UnaryRule = fn(&mut Parser, bool) -> ();
 
 struct ParseRule{
     prefix: BinaryRule,
@@ -286,32 +286,38 @@ impl Parser {
         self.current.tpe == tpe
     }
 
-    fn grouping(&mut self) {
+    fn grouping(&mut self, _can_assign: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
       }
 
-    pub fn number(&mut self) {
+    pub fn number(&mut self, _can_assign: bool) {
         let n = self.previous.text.parse::<f64>().unwrap();
         self.emitter.emit_constant(Value::Number(n), self.previous.line);
     }
 
-    fn string(&mut self) {
+    fn string(&mut self, _can_assign: bool) {
         let value = Value::Object(ObjType::String(Rc::new(self.previous.text.clone())));
         self.emitter.emit_constant(value, self.previous.line);
     }
 
-    fn named_variable(&mut self, name: &Token) {
+    fn named_variable(&mut self, name: &Token, can_assign: bool) {
         let index = self.identifier_constant(&name);
-        self.emitter.emit_byte(OpCode::GetGlobal { index }, name.line);
+        
+        if can_assign && self.matches(TokenType::Equal) {
+            self.expression();
+            self.emitter.emit_byte(OpCode::SetGlobal { index }, self.current.line);
+          } else {
+            self.emitter.emit_byte(OpCode::GetGlobal { index }, self.current.line);
+          }
       }
       
 
-    fn variable(&mut self) {
-        self.named_variable(&self.previous.clone())
+    fn variable(&mut self, can_assign: bool) {
+        self.named_variable(&self.previous.clone(), can_assign)
     }
 
-    fn unary(&mut self) {
+    fn unary(&mut self, _can_assign: bool) {
         let tok = self.previous.clone();
       
         // Compile the operand.
@@ -328,14 +334,20 @@ impl Parser {
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
         let prefix_rule = ParseRule::of_token(&self.previous.tpe).prefix;      
-        prefix_rule(self);
+
+        let can_assign = precedence <= Precedence::Assignment;
+        prefix_rule(self, can_assign);
+
 
         while precedence <= ParseRule::of_token(&self.current.tpe).precedence {
             self.advance();
             let infix_rule = ParseRule::of_token(&self.previous.tpe).infix;
-            infix_rule(self);
-          }
-        
+            infix_rule(self, can_assign);
+        }
+
+        if can_assign && self.matches(TokenType::Equal) {
+            self.error("Invalid assignment target.");
+        }
     }
 
     fn identifier_constant(&mut self, name: &Token) -> usize {
@@ -477,7 +489,7 @@ impl Parser {
         }        
     }
 
-    pub fn binary(&mut self) {
+    pub fn binary(&mut self, _can_assign: bool) {
         // Remember the operator.
         let tok = self.previous.clone();
         let line = self.previous.line;
@@ -505,7 +517,7 @@ impl Parser {
         }
     }
 
-    pub fn literal(&mut self) {
+    pub fn literal(&mut self, _can_assign: bool) {
         let tok = self.previous.clone();
         match tok.tpe {
             TokenType::False => self.emitter.emit_byte(OpCode::False, tok.line),
@@ -515,7 +527,7 @@ impl Parser {
         }
     }
 
-    fn err(&mut self) {
+    fn err(&mut self, _can_assign: bool) {
         self.error("Expect expression.");
     }
 
