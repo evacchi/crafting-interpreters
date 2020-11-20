@@ -107,14 +107,22 @@ impl Scope {
     fn add_local(&mut self, name: Token) {
         let local = Local {
             name,
-            depth: self.depth
+            depth: -1
         };
         self.locals.push(local);
+    }
+
+    fn mark_initialized(&mut self) {
+        let lastidx = self.locals.len() - 1;
+        self.locals[lastidx].depth = self.depth;
     }
 
     fn resolve_local(&mut self, name: &Token) -> Option<usize> {
         for (i, local) in self.locals.iter().enumerate().rev() {
             if name.text == local.name.text {
+                if local.depth == -1 {
+                    panic!("Can't read local variable in its own initializer.");
+                }
                 return Some(i);
             }
         }
@@ -403,6 +411,7 @@ impl Parser {
 
     fn define_variable(&mut self, index: usize) {
         if self.scope.depth > 0 {
+            self.scope.mark_initialized();
             return;
         }
 
