@@ -83,6 +83,12 @@ impl VM {
                 OpCode::True     => self.stack.push(Value::Bool(true)),
                 OpCode::False    => self.stack.push(Value::Bool(false)),
                 OpCode::Pop      => { self.stack.pop(); }
+                OpCode::GetLocal { index } => {
+                    self.stack.push(self.stack[index].clone())
+                }
+                OpCode::SetLocal { index } => {
+                    self.stack[index] = self.stack.last().unwrap().clone()
+                }
                 OpCode::GetGlobal { index } => {
                     let value = self.chunk.read_constant(index);
 

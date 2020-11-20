@@ -7,6 +7,8 @@ pub enum OpCode {
     True,
     False,
     Pop,
+    GetLocal { index: usize },
+    SetLocal { index: usize },
     GetGlobal { index: usize },
     DefineGlobal { index: usize },
     SetGlobal { index: usize },
@@ -90,6 +92,10 @@ impl Chunk {
                 self.simple_instruction("FALSE"),
             OpCode::Pop =>
                 self.simple_instruction("POP"),
+            OpCode::GetLocal { index } =>
+                self.byte_instruction("GET_GLOBAL", index),
+            OpCode::SetLocal { index } =>
+                self.byte_instruction("GET_GLOBAL", index),
             OpCode::GetGlobal { index } =>
                 self.constant_instruction("GET_GLOBAL", index),
             OpCode::DefineGlobal { index } =>
@@ -129,6 +135,10 @@ impl Chunk {
 
     fn simple_instruction(&self, op: &str) {
         println!("{}", op)
+    }
+
+    fn byte_instruction(&self, op: &str, offset: &usize) {
+        println!("{:16} {:4}", op, offset)
     }
 
 }

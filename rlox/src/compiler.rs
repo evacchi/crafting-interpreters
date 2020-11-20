@@ -111,6 +111,15 @@ impl Scope {
         };
         self.locals.push(local);
     }
+
+    fn resolve_local(&mut self, name: &Token) -> Option<usize> {
+        for (i, local) in self.locals.iter().enumerate().rev() {
+            if name.text == local.name.text {
+                return Some(i);
+            }
+        }
+        return None;
+    }
 }
 
 
@@ -302,15 +311,23 @@ impl Parser {
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) {
-        let index = self.identifier_constant(&name);
+        let optindex = self.scope.resolve_local(name);
         
         if can_assign && self.matches(TokenType::Equal) {
             self.expression();
-            self.emitter.emit_byte(OpCode::SetGlobal { index }, self.current.line);
+            let op = match optindex {
+                Some(index) => OpCode::SetLocal { index },
+                None => OpCode::SetGlobal { index: self.identifier_constant(name) }
+            };
+            self.emitter.emit_byte(op, self.current.line);
           } else {
-            self.emitter.emit_byte(OpCode::GetGlobal { index }, self.current.line);
+            let op = match optindex {
+                Some(index) => OpCode::GetLocal { index },
+                None => OpCode::GetGlobal { index: self.identifier_constant(name) }
+            };
+            self.emitter.emit_byte(op, self.current.line);
           }
-      }
+    }
       
 
     fn variable(&mut self, can_assign: bool) {
