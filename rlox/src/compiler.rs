@@ -117,16 +117,17 @@ impl Scope {
         self.locals[lastidx].depth = self.depth;
     }
 
-    fn resolve_local(&mut self, name: &Token) -> Option<usize> {
+    fn resolve_local(&mut self, name: &Token) -> (Option<usize>, Option<String>) {
+        let mut err = None;
         for (i, local) in self.locals.iter().enumerate().rev() {
             if name.text == local.name.text {
                 if local.depth == -1 {
-                    panic!("Can't read local variable in its own initializer.");
+                    err = Some(String::from("Can't read local variable in its own initializer."))
                 }
-                return Some(i);
+                return (Some(i), err);
             }
         }
-        return None;
+        return (None, err);
     }
 }
 
@@ -319,22 +320,26 @@ impl Parser {
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) {
-        let optindex = self.scope.resolve_local(name);
-        
-        if can_assign && self.matches(TokenType::Equal) {
-            self.expression();
-            let op = match optindex {
-                Some(index) => OpCode::SetLocal { index },
-                None => OpCode::SetGlobal { index: self.identifier_constant(name) }
-            };
-            self.emitter.emit_byte(op, self.current.line);
-          } else {
-            let op = match optindex {
-                Some(index) => OpCode::GetLocal { index },
-                None => OpCode::GetGlobal { index: self.identifier_constant(name) }
-            };
-            self.emitter.emit_byte(op, self.current.line);
-          }
+        match self.scope.resolve_local(name) {
+            (None, Some(msg)) => self.error(&msg),
+            (optindex, opterr) => {
+                if let Some(msg) = opterr { self.error(&msg); }
+                if can_assign && self.matches(TokenType::Equal) {
+                    self.expression();
+                    let op = match optindex {
+                        Some(index) => OpCode::SetLocal { index },
+                        None => OpCode::SetGlobal { index: self.identifier_constant(name) }
+                    };
+                    self.emitter.emit_byte(op, self.current.line);
+                } else {
+                    let op = match optindex {
+                        Some(index) => OpCode::GetLocal { index },
+                        None => OpCode::GetGlobal { index: self.identifier_constant(name) }
+                    };
+                    self.emitter.emit_byte(op, self.current.line);
+                }
+            }
+        }
     }
       
 
@@ -382,18 +387,19 @@ impl Parser {
     fn declare_variable(&mut self) {
         if self.scope.depth == 0 { return; }
         let name = self.previous.clone();
-        let iter = &self.scope.locals;
-        for local in iter.iter().rev() {
+        let mut err = false;
+        for local in self.scope.locals.iter().rev() {
             if local.depth != -1 && local.depth < self.scope.depth {
                 break;
             }
 
             if name.text == local.name.text {
-                panic!("Already variable with this name in this scope.");
+                err = true;
+                break; // required for borrow checker (error mutates internal state)
             }
 
         }
-
+        if err { self.error("Already variable with this name in this scope."); }
         self.scope.add_local(name);
     }
       
