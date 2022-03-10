@@ -39,7 +39,7 @@ impl VM {
     fn is_falsey(&self, value: Value) -> bool {
         match value {
             Value::Nil => true,
-            Value::Bool(b) => b,
+            Value::Bool(b) => !b,
             _ => false
         }
     }
@@ -178,6 +178,12 @@ impl VM {
                     self.stack.pop().unwrap().print();
                     println!();
                 }
+                OpCode::JumpIfFalse { jump } => {
+                    let x = self.stack.last().unwrap().clone();
+                    if self.is_falsey(x) {
+                        self.ip += jump;
+                    }
+                },
                 OpCode::Return => {
                     // Exit interpreter.
                     return InterpretResult::Ok

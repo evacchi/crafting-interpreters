@@ -17,6 +17,7 @@ pub enum OpCode {
     Less,
     Negate   ,
     Print   ,
+    JumpIfFalse { jump: usize },
     Return   ,
     Add      ,
     Subtract ,
@@ -27,7 +28,7 @@ pub enum OpCode {
 
 #[derive(Clone)]
 pub struct Chunk {
-    code: Vec<OpCode>,
+    pub code: Vec<OpCode>,
     values: Vec<Value>,
     lines: Vec<usize>
 }
@@ -122,6 +123,8 @@ impl Chunk {
                 self.simple_instruction("NEGATE"),
             OpCode::Print => 
                 self.simple_instruction("PRINT"),
+            OpCode::JumpIfFalse { jump } =>
+                self.jump_instruction("OP_JUMP", 1, offset, jump),
             OpCode::Return => 
                 self.simple_instruction("RETURN"),
         }
@@ -140,5 +143,10 @@ impl Chunk {
     fn byte_instruction(&self, op: &str, offset: &usize) {
         println!("{:16} {:4}", op, offset)
     }
+
+    fn jump_instruction(&self, op: &str, sign: usize, offset: usize, jump: &usize) {
+        println!("{:16} {:4}", op, offset + sign * jump);
+    }
+
 
 }

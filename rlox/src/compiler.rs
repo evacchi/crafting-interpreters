@@ -32,15 +32,15 @@ impl Precedence {
     fn from_index(index: usize) -> Option<Precedence> {
         match index {
             0  => Some(Precedence::None),
-            1  => Some(Precedence::Assignment), 
-            2  => Some(Precedence::Or),         
-            3  => Some(Precedence::And),        
-            4  => Some(Precedence::Equality),   
-            5  => Some(Precedence::Comparison), 
-            6  => Some(Precedence::Term),       
-            7  => Some(Precedence::Factor),     
-            8  => Some(Precedence::Unary),      
-            9  => Some(Precedence::Call),       
+            1  => Some(Precedence::Assignment),
+            2  => Some(Precedence::Or),
+            3  => Some(Precedence::And),
+            4  => Some(Precedence::Equality),
+            5  => Some(Precedence::Comparison),
+            6  => Some(Precedence::Term),
+            7  => Some(Precedence::Factor),
+            8  => Some(Precedence::Unary),
+            9  => Some(Precedence::Call),
             10 => Some(Precedence::Primary),
             _  => None
         }
@@ -54,7 +54,7 @@ type UnaryRule = fn(&mut Parser, bool) -> ();
 
 struct ParseRule{
     prefix: BinaryRule,
-    infix: UnaryRule, 
+    infix: UnaryRule,
     precedence: Precedence
 }
 
@@ -87,7 +87,7 @@ impl Scope {
     fn new() -> Scope {
         Scope {
             locals: Vec::new(),
-            depth: 0,        
+            depth: 0,
         }
     }
 
@@ -160,7 +160,7 @@ struct BytecodeEmitter {
 }
 
 impl BytecodeEmitter {
-    pub fn new() -> BytecodeEmitter { 
+    pub fn new() -> BytecodeEmitter {
         BytecodeEmitter {
             current_chunk : Chunk::new(),
             memory : Memory::new()
@@ -195,6 +195,12 @@ impl BytecodeEmitter {
         index
     }
 
+    pub fn patch_jump(&mut self, offset: usize) {
+        let jump = self.current_chunk.code.len() - offset;
+        self.current_chunk.code[offset] = OpCode::JumpIfFalse{ jump };
+    }
+
+
 }
 
 impl ParseRule {
@@ -208,7 +214,7 @@ impl ParseRule {
             TokenType::Start        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::LeftParen    => ParseRule::new(Parser::grouping, Parser::err,      Precedence::None),
             TokenType::RightParen   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
-            TokenType::LeftBrace    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None), 
+            TokenType::LeftBrace    => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::RightBrace   => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Comma        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Dot          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -274,11 +280,11 @@ impl Parser {
 
     pub fn advance(&mut self) {
         self.previous = self.current.clone();
-    
+
         loop {
             self.current = self.scanner.scan();
             if self.current.tpe != TokenType::Error { break;}
-        
+
             self.error_at_current(&self.current.text.clone());
         }
     }
@@ -288,7 +294,7 @@ impl Parser {
             self.advance();
             return;
         }
-        
+
         self.error_at_current(message);
     }
 
@@ -308,7 +314,7 @@ impl Parser {
     fn grouping(&mut self, _can_assign: bool) {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after expression.");
-      }
+    }
 
     pub fn number(&mut self, _can_assign: bool) {
         let n = self.previous.text.parse::<f64>().unwrap();
@@ -335,7 +341,7 @@ impl Parser {
                 Err(msg) => self.error(msg)
             }
 
-          } else {
+        } else {
             match result {
                 Ok(optindex) => {
                     let op = match optindex {
@@ -348,7 +354,7 @@ impl Parser {
             }
         }
     }
-      
+
 
     fn variable(&mut self, can_assign: bool) {
         self.named_variable(&self.previous.clone(), can_assign)
@@ -356,21 +362,21 @@ impl Parser {
 
     fn unary(&mut self, _can_assign: bool) {
         let tok = self.previous.clone();
-      
+
         // Compile the operand.
         self.parse_precedence(Precedence::Unary);
-      
+
         // Emit the operator instruction.
-        match tok.tpe { 
+        match tok.tpe {
             TokenType::Bang => self.emitter.emit_byte(OpCode::Not, self.previous.line),
             TokenType::Minus => self.emitter.emit_byte(OpCode::Negate, self.previous.line),
             _ => {} // Unreachable.
         }
     }
-      
+
     fn parse_precedence(&mut self, precedence: Precedence) {
         self.advance();
-        let prefix_rule = ParseRule::of_token(&self.previous.tpe).prefix;      
+        let prefix_rule = ParseRule::of_token(&self.previous.tpe).prefix;
 
         let can_assign = precedence <= Precedence::Assignment;
         prefix_rule(self, can_assign);
@@ -394,22 +400,19 @@ impl Parser {
     fn declare_variable(&mut self) {
         if self.scope.depth == 0 { return; }
         let name = self.previous.clone();
-        let iter = self.scope.locals.clone();
-        let mut has_err = false;
+        let iter = &self.scope.locals.clone();
         for local in iter.iter().rev() {
             if local.depth != -1 && local.depth < self.scope.depth {
                 break;
             }
             if name.text == local.name.text {
-                has_err = true;
+                self.error("Already variable with this name in this scope.");
             }
         }
-        if has_err {
-            self.error("Already variable with this name in this scope.");
-        }
+
         self.scope.add_local(name);
     }
-      
+
 
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::Identifier, err);
@@ -429,7 +432,7 @@ impl Parser {
         }
 
         self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
-    }      
+    }
 
     pub fn expression(&mut self) {
         self.parse_precedence(Precedence::Assignment)
@@ -445,7 +448,7 @@ impl Parser {
 
     fn var_declaration(&mut self) {
         let global = self.parse_variable("Expect variable name.");
-      
+
         if self.matches(TokenType::Equal) {
             self.expression();
         } else {
@@ -453,17 +456,30 @@ impl Parser {
         }
         self.consume(TokenType::Semicolon,
                 "Expect ';' after variable declaration.");
-      
+
         self.define_variable(global);
       }
-      
+
 
     fn expression_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after expression.");
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
-      }
-      
+    }
+
+    fn if_statement(&mut self) {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
+        self.expression();
+        self.consume(TokenType::RightParen, "Expect ')' after condition.");
+
+        self.emitter.emit_byte(OpCode::JumpIfFalse{ jump: 0xFF }, self.current.line);
+        let offset = self.emitter.current_chunk.code.len() - 1;
+        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        self.statement();
+        self.emitter.patch_jump(offset);
+        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+    }
+
 
     fn print_statement(&mut self) {
         self.expression();
@@ -473,7 +489,7 @@ impl Parser {
 
     fn synchronize(&mut self) {
         self.panic_mode = true;
-        
+
         while self.current.tpe != TokenType::Eof {
             if self.previous.tpe == TokenType::Semicolon {
                 return;
@@ -500,7 +516,7 @@ impl Parser {
         } else {
             self.statement();
         }
-    
+
         if self.panic_mode {
             self.synchronize();
         }
@@ -509,6 +525,8 @@ impl Parser {
     pub fn statement(&mut self) {
         if self.matches(TokenType::Print) {
             self.print_statement();
+        } else if self.matches(TokenType::If) {
+            self.if_statement();
         } else if self.matches(TokenType::LeftBrace) {
             self.scope.begin();
             self.block();
@@ -525,14 +543,14 @@ impl Parser {
         // debug statements
         if !self.had_error {
             self.emitter.current_chunk.disassemble("code");
-        }        
+        }
     }
 
     pub fn binary(&mut self, _can_assign: bool) {
         // Remember the operator.
         let tok = self.previous.clone();
         let line = self.previous.line;
-      
+
         // Compile the right operand.
         let rule = ParseRule::of_token(&tok.tpe);
         let next_rule = rule.precedence as usize + 1;
@@ -581,9 +599,9 @@ impl Parser {
     pub fn error_at(&mut self, token: Token, message: &str) {
         if self.panic_mode { return; }
         self.panic_mode = true;
-      
+
         eprint!("[line {}] Error", token.line);
-      
+
         if token.tpe == TokenType::Eof {
             eprint!(" at end");
         } else if token.tpe == TokenType::Error {
@@ -591,7 +609,7 @@ impl Parser {
         } else {
             eprint!( " at '{}'", token.text);
         }
-      
+
         eprint!( ": {}\n", message);
         self.had_error = true;
     }
