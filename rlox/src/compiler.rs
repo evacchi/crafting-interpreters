@@ -239,7 +239,7 @@ impl ParseRule {
             TokenType::Identifier   => ParseRule::new(Parser::variable, Parser::err,      Precedence::None),
             TokenType::String       => ParseRule::new(Parser::string,   Parser::err,      Precedence::None),
             TokenType::Number       => ParseRule::new(Parser::number,   Parser::err,      Precedence::None),
-            TokenType::And          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::And          => ParseRule::new(Parser::err,      Parser::and_,     Precedence::And),
             TokenType::Class        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Else         => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::False        => ParseRule::new(Parser::literal,  Parser::err,      Precedence::None),
@@ -247,7 +247,7 @@ impl ParseRule {
             TokenType::Fun          => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::If           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Nil          => ParseRule::new(Parser::literal,  Parser::err,      Precedence::None),
-            TokenType::Or           => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
+            TokenType::Or           => ParseRule::new(Parser::err,      Parser::or_,      Precedence::Or),
             TokenType::Print        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Return       => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
             TokenType::Super        => ParseRule::new(Parser::err,      Parser::err,      Precedence::None),
@@ -325,6 +325,18 @@ impl Parser {
         let n = self.previous.text.parse::<f64>().unwrap();
         self.emitter.emit_constant(Value::Number(n), self.previous.line);
     }
+
+    fn or_(&mut self, can_assign: bool) {
+        self.emitter.emit_byte(OpCode::JumpIfFalse{jump:0xFF}, self.current.line);
+        let else_jump = self.emitter.current_chunk.code.len() - 1; 
+        self.emitter.emit_byte(OpCode::Jump{jump:0xFF}, self.current.line);
+        let end_jump = self.emitter.current_chunk.code.len() - 1; 
+        self.emitter.patch_jump(else_jump);
+        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        self.parse_precedence(Precedence::Or);
+        self.emitter.patch_jump(end_jump);
+    }
+
 
     fn string(&mut self, _can_assign: bool) {
         let value = Value::Object(ObjType::String(Rc::new(self.previous.text.clone())));
@@ -437,6 +449,14 @@ impl Parser {
         }
 
         self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
+    }
+
+    fn and_(&mut self, can_assign: bool) {
+        self.emitter.emit_byte(OpCode::JumpIfFalse{ jump: 0xFF }, self.current.line);
+        let end_jump = self.emitter.current_chunk.code.len() - 1;
+        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        self.parse_precedence(Precedence::And);
+        self.emitter.patch_jump(end_jump);
     }
 
     pub fn expression(&mut self) {
