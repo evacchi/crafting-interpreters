@@ -18,6 +18,7 @@ pub enum OpCode {
     Negate   ,
     Print   ,
     JumpIfFalse { jump: usize },
+    Jump { jump: usize },
     Return   ,
     Add      ,
     Subtract ,
@@ -124,6 +125,8 @@ impl Chunk {
             OpCode::Print => 
                 self.simple_instruction("PRINT"),
             OpCode::JumpIfFalse { jump } =>
+                self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset, jump),
+            OpCode::Jump { jump } =>
                 self.jump_instruction("OP_JUMP", 1, offset, jump),
             OpCode::Return => 
                 self.simple_instruction("RETURN"),

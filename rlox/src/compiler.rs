@@ -196,8 +196,13 @@ impl BytecodeEmitter {
     }
 
     pub fn patch_jump(&mut self, offset: usize) {
-        let jump = self.current_chunk.code.len() - offset;
-        self.current_chunk.code[offset] = OpCode::JumpIfFalse{ jump };
+        let new_jump = self.current_chunk.code.len() - 1 - offset;
+        let new_op = match self.current_chunk.code[offset] {
+            OpCode::JumpIfFalse{ jump: _ } => OpCode::JumpIfFalse{ jump: new_jump },
+            OpCode::Jump{ jump: _ } => OpCode::Jump{ jump: new_jump },
+            op => panic!("Expected a Jump instruction! Found {:?}", op),
+        };
+        self.current_chunk.code[offset] = new_op;
     }
 
 
@@ -458,7 +463,7 @@ impl Parser {
                 "Expect ';' after variable declaration.");
 
         self.define_variable(global);
-      }
+    }
 
 
     fn expression_statement(&mut self) {
@@ -473,11 +478,19 @@ impl Parser {
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         self.emitter.emit_byte(OpCode::JumpIfFalse{ jump: 0xFF }, self.current.line);
-        let offset = self.emitter.current_chunk.code.len() - 1;
+        let then_jump = self.emitter.current_chunk.code.len() - 1;
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
         self.statement();
-        self.emitter.patch_jump(offset);
+        
+        self.emitter.emit_byte(OpCode::Jump{ jump: 0xFF }, self.current.line);
+        let else_jump = self.emitter.current_chunk.code.len() - 1;
+        
+        self.emitter.patch_jump(then_jump);
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
+
+        if self.matches(TokenType::Else) { self.statement(); }
+
+        self.emitter.patch_jump(else_jump)
     }
 
 

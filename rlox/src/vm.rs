@@ -184,6 +184,9 @@ impl VM {
                         self.ip += jump;
                     }
                 },
+                OpCode::Jump { jump } => {
+                    self.ip += jump;
+                }
                 OpCode::Return => {
                     // Exit interpreter.
                     return InterpretResult::Ok
