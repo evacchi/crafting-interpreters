@@ -1,5 +1,4 @@
 use std::cmp::PartialOrd;
-use std::rc::Rc;
 
 use chunk::Chunk;
 use chunk::OpCode;
@@ -326,7 +325,7 @@ impl Parser {
         self.emitter.emit_constant(Value::Number(n), self.previous.line);
     }
 
-    fn or_(&mut self, can_assign: bool) {
+    fn or_(&mut self, _can_assign: bool) {
         self.emitter.emit_byte(OpCode::JumpIfFalse{jump:0xFF}, self.current.line);
         let else_jump = self.emitter.current_chunk.code.len() - 1; 
         self.emitter.emit_byte(OpCode::Jump{jump:0xFF}, self.current.line);
@@ -337,9 +336,8 @@ impl Parser {
         self.emitter.patch_jump(end_jump);
     }
 
-
     fn string(&mut self, _can_assign: bool) {
-        let value = Value::Object(ObjType::String(Rc::new(self.previous.text.clone())));
+        let value = Value::Object(ObjType::String(self.previous.text.clone()));
         self.emitter.emit_constant(value, self.previous.line);
     }
 
@@ -411,7 +409,7 @@ impl Parser {
     }
 
     fn identifier_constant(&mut self, name: &Token) -> usize {
-        self.emitter.write_constant(Value::Object(ObjType::String(Rc::new(name.text.clone()))))
+        self.emitter.write_constant(Value::Object(ObjType::String(name.text.clone())))
     }
 
     fn declare_variable(&mut self) {
@@ -451,7 +449,7 @@ impl Parser {
         self.emitter.emit_byte(OpCode::DefineGlobal { index }, self.current.line);
     }
 
-    fn and_(&mut self, can_assign: bool) {
+    fn and_(&mut self, _can_assign: bool) {
         self.emitter.emit_byte(OpCode::JumpIfFalse{ jump: 0xFF }, self.current.line);
         let end_jump = self.emitter.current_chunk.code.len() - 1;
         self.emitter.emit_byte(OpCode::Pop, self.current.line);

@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Compiler;
@@ -142,7 +140,7 @@ impl VM {
         
                                     let owned = format!("{}{}", a, b);
                                     
-                                    self.stack.push(Value::Object(ObjType::String(Rc::new(owned))));
+                                    self.stack.push(Value::Object(ObjType::String(owned)));
                                 }
                             }
                         }

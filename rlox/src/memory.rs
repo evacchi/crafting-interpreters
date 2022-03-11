@@ -1,4 +1,3 @@
-use std::rc::Rc;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
@@ -8,7 +7,7 @@ use value::Value;
 pub struct Memory {
     objects: Vec<ObjType>,
     globals: HashMap<String, Value>,
-    strings: HashSet<Rc<String>>,
+    strings: HashSet<String>,
 }
 
 impl Memory {
@@ -26,7 +25,7 @@ impl Memory {
     pub fn get_global(&mut self, s: String) -> Option<&Value> {
         self.globals.get(&s)
     }
-
+    
     pub fn delete_global(&mut self, s: String) {
         self.globals.remove(&s);
     }
@@ -37,7 +36,7 @@ impl Memory {
             ObjType::String(r) =>  { self.intern(r); }
         }
     }
-    pub fn intern(&mut self, obj: Rc<String>) -> Rc<String> {
+    pub fn intern(&mut self, obj: String) -> String {
         match self.strings.get(&obj) {
             None => {
                 let item = obj.clone();
