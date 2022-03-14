@@ -519,19 +519,6 @@ impl Parser {
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
     }
 
-    /*
-    if (match(TOKEN_SEMICOLON)) {
-      // No initializer.
-    } else if (match(TOKEN_VAR)) {
-      varDeclaration();
-    } else {
-      expressionStatement();
-    }
-
-    int loopStart = currentChunk()->count;
-
-      */
-
     fn for_statement(&mut self) {
         self.scope.begin();
 
@@ -544,7 +531,7 @@ impl Parser {
             self.expression_statement();
         }
 
-        let loop_start = self.emitter.current_chunk.code.len() - 1;
+        let mut loop_start = self.emitter.current_chunk.code.len();
 
         let mut exit_jump = None;
 
@@ -560,7 +547,23 @@ impl Parser {
             self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
         }
 
-        self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+        if !self.matches(TokenType::RightParen) {
+            self.emitter
+                .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
+            let body_jump = self.emitter.current_chunk.code.len() - 1;
+
+            let increment_start = self.emitter.current_chunk.code.len() - 1;
+            self.expression();
+            self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+
+            let jump = self.emitter.current_chunk.code.len() - loop_start;
+            self.emitter
+                .emit_byte(OpCode::Loop { jump }, self.current.line);
+
+            loop_start = increment_start;
+
+            self.emitter.patch_jump(body_jump);
+        }
 
         self.statement();
         let jump = self.emitter.current_chunk.code.len() - loop_start;

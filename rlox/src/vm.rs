@@ -196,7 +196,6 @@ impl VM {
                     self.ip += jump;
                 }
                 OpCode::Loop { jump } => {
-                    print!("{} - {}", self.ip, jump);
                     self.ip -= jump;
                 }
                 OpCode::Return => {
