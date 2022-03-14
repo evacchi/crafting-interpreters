@@ -3,8 +3,8 @@ mod compiler;
 mod memory;
 mod object;
 mod scanner;
-mod vm;
 mod value;
+mod vm;
 
 use std::env;
 use std::fs;
@@ -12,8 +12,8 @@ use std::io;
 use std::io::Write;
 use std::process;
 
-use vm::VM;
 use vm::InterpretResult;
+use vm::VM;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -35,22 +35,26 @@ fn repl(vm: &mut VM) {
         let mut line = String::new();
         print!("> ");
         io::stdout().flush().unwrap();
-        io::stdin().read_line(&mut line)
+        io::stdin()
+            .read_line(&mut line)
             .expect("error: unable to read user input");
-            if line.is_empty() {
-                println!();
-                break;
-            }
+        if line.is_empty() {
+            println!();
+            break;
+        }
         vm.interpret(&line);
     }
 }
 
 fn run_file(vm: &mut VM, f: &str) {
-    let source = fs::read_to_string(f)
-                    .expect("Could not open file");
+    let source = fs::read_to_string(f).expect("Could not open file");
     match vm.interpret(&source) {
         InterpretResult::Ok => {}
-        InterpretResult::CompileError => { process::exit(65); }
-        InterpretResult::RuntimeError => { process::exit(70); }
-    } 
+        InterpretResult::CompileError => {
+            process::exit(65);
+        }
+        InterpretResult::RuntimeError => {
+            process::exit(70);
+        }
+    }
 }

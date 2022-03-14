@@ -1,4 +1,4 @@
-#[derive(Debug,Clone,PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ObjType {
-    String(String)
+    String(String),
 }

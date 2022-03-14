@@ -15,7 +15,7 @@ impl Memory {
         Memory {
             objects: Vec::new(),
             globals: HashMap::new(),
-            strings: HashSet::new()
+            strings: HashSet::new(),
         }
     }
     pub fn set_global(&mut self, s: String, value: Value) -> bool {
@@ -25,7 +25,7 @@ impl Memory {
     pub fn get_global(&mut self, s: String) -> Option<&Value> {
         self.globals.get(&s)
     }
-    
+
     pub fn delete_global(&mut self, s: String) {
         self.globals.remove(&s);
     }
@@ -33,7 +33,9 @@ impl Memory {
     pub fn push(&mut self, obj: ObjType) {
         self.objects.push(obj.clone());
         match obj {
-            ObjType::String(r) =>  { self.intern(r); }
+            ObjType::String(r) => {
+                self.intern(r);
+            }
         }
     }
     pub fn intern(&mut self, obj: String) -> String {

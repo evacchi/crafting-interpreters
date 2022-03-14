@@ -3,45 +3,69 @@ pub struct Scanner {
     chars: Vec<char>,
     start: usize,
     current: usize,
-    line: usize
-
+    line: usize,
 }
 
-#[derive(Debug,PartialEq,Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum TokenType {
     // parser internal initial state
     Start,
 
     // Single-character tokens.
-    LeftParen, RightParen,
-    LeftBrace, RightBrace,
-    Comma, Dot, Minus, Plus,
-    Semicolon, Slash, Star,
-    
+    LeftParen,
+    RightParen,
+    LeftBrace,
+    RightBrace,
+    Comma,
+    Dot,
+    Minus,
+    Plus,
+    Semicolon,
+    Slash,
+    Star,
+
     // One or two character tokens.
-    Bang, BangEqual,
-    Equal, EqualEqual,
-    Greater, GreaterEqual,
-    Less, LessEqual,
-    
+    Bang,
+    BangEqual,
+    Equal,
+    EqualEqual,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+
     // Literals.
-    Identifier, String, Number,
-    
+    Identifier,
+    String,
+    Number,
+
     // Keywords.
-    And, Class, Else, False,
-    For, Fun, If, Nil, Or,
-    Print, Return, Super, This,
-    True, Var, While,
-    
+    And,
+    Class,
+    Else,
+    False,
+    For,
+    Fun,
+    If,
+    Nil,
+    Or,
+    Print,
+    Return,
+    Super,
+    This,
+    True,
+    Var,
+    While,
+
     Error,
-    Eof,    
+    Eof,
 }
 
 #[derive(Debug)]
 pub struct Token {
     pub tpe: TokenType,
     pub text: String,
-    pub line: usize
+    pub line: usize,
 }
 
 impl Clone for Token {
@@ -49,7 +73,7 @@ impl Clone for Token {
         Token {
             tpe: self.tpe.clone(),
             text: self.text.clone(),
-            line: self.line
+            line: self.line,
         }
     }
 }
@@ -61,7 +85,7 @@ impl Scanner {
             chars: source.chars().collect::<Vec<_>>(),
             start: 0,
             current: 0,
-            line: 1
+            line: 1,
         }
     }
 
@@ -85,7 +109,7 @@ impl Scanner {
                 self.current += 1;
                 true
             }
-            _ => false
+            _ => false,
         }
     }
 
@@ -96,52 +120,53 @@ impl Scanner {
 
         match self.advance() {
             None => self.make_eof(),
-            Some(&c) =>
-                match c {
-                    d if '_' == d || d.is_alphabetic() => self.identifier(),
-                    d if d.is_digit(10) => self.number(),
-                    '(' => self.make_token(TokenType::LeftParen),
-                    ')' => self.make_token(TokenType::RightParen),
-                    '{' => self.make_token(TokenType::LeftBrace),
-                    '}' => self.make_token(TokenType::RightBrace),
-                    ';' => self.make_token(TokenType::Semicolon),
-                    ',' => self.make_token(TokenType::Comma),
-                    '.' => self.make_token(TokenType::Dot),
-                    '-' => self.make_token(TokenType::Minus),
-                    '+' => self.make_token(TokenType::Plus),
-                    '/' => self.make_token(TokenType::Slash),
-                    '*' => self.make_token(TokenType::Star),
-                    '!' if self.match_char('=') =>  
-                        self.make_token(TokenType::BangEqual),
-                    '!' => self.make_token(TokenType::Bang),
-                    '=' if self.match_char('=') => 
-                        self.make_token(TokenType::EqualEqual),
-                    '=' => self.make_token(TokenType::Equal),
-                    '<' if self.match_char('=') =>
-                        self.make_token(TokenType::LessEqual),
-                    '<' =>
-                        self.make_token(TokenType::Less),
-                    '>' if self.match_char('=') =>
-                        self.make_token(TokenType::GreaterEqual),
-                    '>' => self.make_token(TokenType::Greater),
-                    '"' => self.string(),
-                    _   => self.error_token("Unexpected character.")
-                }
+            Some(&c) => match c {
+                d if '_' == d || d.is_alphabetic() => self.identifier(),
+                d if d.is_digit(10) => self.number(),
+                '(' => self.make_token(TokenType::LeftParen),
+                ')' => self.make_token(TokenType::RightParen),
+                '{' => self.make_token(TokenType::LeftBrace),
+                '}' => self.make_token(TokenType::RightBrace),
+                ';' => self.make_token(TokenType::Semicolon),
+                ',' => self.make_token(TokenType::Comma),
+                '.' => self.make_token(TokenType::Dot),
+                '-' => self.make_token(TokenType::Minus),
+                '+' => self.make_token(TokenType::Plus),
+                '/' => self.make_token(TokenType::Slash),
+                '*' => self.make_token(TokenType::Star),
+                '!' if self.match_char('=') => self.make_token(TokenType::BangEqual),
+                '!' => self.make_token(TokenType::Bang),
+                '=' if self.match_char('=') => self.make_token(TokenType::EqualEqual),
+                '=' => self.make_token(TokenType::Equal),
+                '<' if self.match_char('=') => self.make_token(TokenType::LessEqual),
+                '<' => self.make_token(TokenType::Less),
+                '>' if self.match_char('=') => self.make_token(TokenType::GreaterEqual),
+                '>' => self.make_token(TokenType::Greater),
+                '"' => self.string(),
+                _ => self.error_token("Unexpected character."),
+            },
         }
     }
 
     fn skip_whitespace(&mut self) {
         while let Some(&c) = self.peek() {
             match c {
-                ' ' | '\r' | '\t' => { self.advance(); }
+                ' ' | '\r' | '\t' => {
+                    self.advance();
+                }
                 '\n' => {
                     self.line += 1;
                     self.advance();
                 }
-                '/' => if let Some('/') = self.peek_next() {
-                    while let Some(&c) = self.peek() {
-                        if c == '\n' { break; }
-                        else { self.advance(); }
+                '/' => {
+                    if let Some('/') = self.peek_next() {
+                        while let Some(&c) = self.peek() {
+                            if c == '\n' {
+                                break;
+                            } else {
+                                self.advance();
+                            }
+                        }
                     }
                 }
                 _ => {
@@ -152,8 +177,9 @@ impl Scanner {
     }
 
     fn check_keyword(&self, start: usize, length: usize, rest: &str, tpe: TokenType) -> TokenType {
-        if self.current - self.start == start + length &&
-            & self.source[self.start + start .. self.start + start + length] == rest {
+        if self.current - self.start == start + length
+            && &self.source[self.start + start..self.start + start + length] == rest
+        {
             tpe
         } else {
             TokenType::Identifier
@@ -166,30 +192,26 @@ impl Scanner {
             'c' => self.check_keyword(1, 4, "lass", TokenType::Class),
             'e' => self.check_keyword(1, 3, "lse", TokenType::Else),
             'i' => self.check_keyword(1, 1, "f", TokenType::If),
-            'f' if self.current - self.start > 1 => {
-                match self.chars[self.start + 1] {
-                        'a'=> self.check_keyword(2, 3, "lse", TokenType::False),
-                        'o'=> self.check_keyword(2, 1, "r", TokenType::For),
-                        'u'=> self.check_keyword(2, 1, "n", TokenType::Fun),
-                        _ => TokenType::Identifier
-                    }
-                }
+            'f' if self.current - self.start > 1 => match self.chars[self.start + 1] {
+                'a' => self.check_keyword(2, 3, "lse", TokenType::False),
+                'o' => self.check_keyword(2, 1, "r", TokenType::For),
+                'u' => self.check_keyword(2, 1, "n", TokenType::Fun),
+                _ => TokenType::Identifier,
+            },
             'n' => self.check_keyword(1, 2, "il", TokenType::Nil),
             'o' => self.check_keyword(1, 1, "r", TokenType::Or),
             'p' => self.check_keyword(1, 4, "rint", TokenType::Print),
             'r' => self.check_keyword(1, 5, "eturn", TokenType::Return),
             's' => self.check_keyword(1, 4, "uper", TokenType::Super),
-            't' if self.current - self.start > 1 => {
-                match self.chars[self.start + 1] {
-                        'h'=> self.check_keyword(2, 2, "is", TokenType::This),
-                        'r'=> self.check_keyword(2, 2, "ue", TokenType::True),
-                        _ => TokenType::Identifier
-                    }
-                }
+            't' if self.current - self.start > 1 => match self.chars[self.start + 1] {
+                'h' => self.check_keyword(2, 2, "is", TokenType::This),
+                'r' => self.check_keyword(2, 2, "ue", TokenType::True),
+                _ => TokenType::Identifier,
+            },
             'v' => self.check_keyword(1, 2, "ar", TokenType::Var),
             'w' => self.check_keyword(1, 4, "hile", TokenType::While),
             _ => TokenType::Identifier,
-          }
+        }
     }
 
     fn identifier(&mut self) -> Token {
@@ -198,15 +220,18 @@ impl Scanner {
                 Some(c) if c.is_digit(10) || c.is_alphabetic() || *c == '_' => {
                     self.advance();
                 }
-                _ => return self.make_token(self.identifier_type())
+                _ => return self.make_token(self.identifier_type()),
             }
         }
     }
 
     fn number(&mut self) -> Token {
         while let Some(d) = self.peek() {
-            if d.is_digit(10) { self.advance(); }
-            else { break; }
+            if d.is_digit(10) {
+                self.advance();
+            } else {
+                break;
+            }
         }
         // Look for a fractional part.
         if let (Some('.'), Some(d)) = (self.peek(), self.peek_next()) {
@@ -215,26 +240,36 @@ impl Scanner {
                 self.advance();
 
                 while let Some(d) = self.peek() {
-                    if d.is_digit(10) { self.advance(); }
-                    else { break; }
+                    if d.is_digit(10) {
+                        self.advance();
+                    } else {
+                        break;
+                    }
                 }
             }
         }
 
         self.make_token(TokenType::Number)
-      }
+    }
 
     fn string(&mut self) -> Token {
         while let Some(&c) = self.peek() {
             match c {
-                '"' => { break; }
-                '\n' => { self.line += 1; self.advance(); }
-                _ => {  self.advance(); }
+                '"' => {
+                    break;
+                }
+                '\n' => {
+                    self.line += 1;
+                    self.advance();
+                }
+                _ => {
+                    self.advance();
+                }
             }
         }
 
         if self.peek().is_none() {
-            return self.error_token("Unterminated string.")
+            return self.error_token("Unterminated string.");
         }
 
         // The closing quote.
@@ -244,9 +279,9 @@ impl Scanner {
 
     fn make_eof(&self) -> Token {
         Token {
-            tpe:  TokenType::Eof,
+            tpe: TokenType::Eof,
             text: String::from(""),
-            line: self.line
+            line: self.line,
         }
     }
 
@@ -254,7 +289,7 @@ impl Scanner {
         Token {
             tpe: tpe,
             text: String::from(&self.source[self.start..self.current]),
-            line: self.line
+            line: self.line,
         }
     }
 
@@ -262,7 +297,7 @@ impl Scanner {
         Token {
             tpe: TokenType::Error,
             text: String::from(message),
-            line: self.line
+            line: self.line,
         }
-      }
+    }
 }
