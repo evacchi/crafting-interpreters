@@ -519,12 +519,47 @@ impl Parser {
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
     }
 
+    /*
+    if (match(TOKEN_SEMICOLON)) {
+      // No initializer.
+    } else if (match(TOKEN_VAR)) {
+      varDeclaration();
+    } else {
+      expressionStatement();
+    }
+
+    int loopStart = currentChunk()->count;
+
+      */
+
     fn for_statement(&mut self) {
+        self.scope.begin();
+
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
-        self.consume(TokenType::Semicolon, "Expect ';'.");
+        if self.matches(TokenType::Semicolon) {
+            // No inizializer.
+        } else if self.matches(TokenType::Var) {
+            self.var_declaration();
+        } else {
+            self.expression_statement();
+        }
 
         let loop_start = self.emitter.current_chunk.code.len() - 1;
-        self.consume(TokenType::Semicolon, "Expect ';'.");
+
+        let mut exit_jump = None;
+
+        if !self.matches(TokenType::Semicolon) {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
+
+            // Jump out of the loop if the condition is false.
+            self.emitter
+                .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
+            exit_jump = Some(self.emitter.current_chunk.code.len() - 1);
+
+            self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
+        }
+
         self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
 
         self.statement();
@@ -532,6 +567,12 @@ impl Parser {
         self.emitter
             .emit_byte(OpCode::Loop { jump }, self.current.line);
 
+        if let Some(jump) = exit_jump {
+            self.emitter.patch_jump(jump);
+            self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
+        }
+
+        self.scope.end();
     }
 
     fn if_statement(&mut self) {
