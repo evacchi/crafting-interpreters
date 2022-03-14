@@ -519,6 +519,21 @@ impl Parser {
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
     }
 
+    fn for_statement(&mut self) {
+        self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
+        self.consume(TokenType::Semicolon, "Expect ';'.");
+
+        let loop_start = self.emitter.current_chunk.code.len() - 1;
+        self.consume(TokenType::Semicolon, "Expect ';'.");
+        self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
+
+        self.statement();
+        let jump = self.emitter.current_chunk.code.len() - loop_start;
+        self.emitter
+            .emit_byte(OpCode::Loop { jump }, self.current.line);
+
+    }
+
     fn if_statement(&mut self) {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
         self.expression();
@@ -611,6 +626,8 @@ impl Parser {
     pub fn statement(&mut self) {
         if self.matches(TokenType::Print) {
             self.print_statement();
+        } else if self.matches(TokenType::For) {
+            self.for_statement();
         } else if self.matches(TokenType::If) {
             self.if_statement();
         } else if self.matches(TokenType::While) {
