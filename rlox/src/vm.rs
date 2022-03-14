@@ -15,12 +15,17 @@ pub struct VM {
 pub enum InterpretResult {
     Ok,
     CompileError,
-    RuntimeError
+    RuntimeError,
 }
 
 impl VM {
     pub fn new() -> VM {
-        VM { chunk: Chunk::new(), ip: 0, stack: Vec::new(), memory: Memory::new() }
+        VM {
+            chunk: Chunk::new(),
+            ip: 0,
+            stack: Vec::new(),
+            memory: Memory::new(),
+        }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
@@ -38,26 +43,30 @@ impl VM {
         match value {
             Value::Nil => true,
             Value::Bool(b) => !b,
-            _ => false
+            _ => false,
         }
     }
 
-    fn binary_op(&mut self, op: fn(f64,f64) -> f64) {
-        if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
+    fn binary_op(&mut self, op: fn(f64, f64) -> f64) {
+        if let (&Value::Number(b), &Value::Number(a)) = (
+            self.stack.last().unwrap(),
+            self.stack.get(self.stack.len() - 2).unwrap(),
+        ) {
             self.stack.pop();
             self.stack.pop();
-            self.stack.push(Value::Number(op(a,b)))
+            self.stack.push(Value::Number(op(a, b)))
         }
     }
 
-    fn bool_op(&mut self, op: fn(f64,f64) -> bool) {
-        if let (&Value::Number(b), &Value::Number(a)) =  (self.stack.last().unwrap(), self.stack.get(self.stack.len()-2).unwrap()) {
+    fn bool_op(&mut self, op: fn(f64, f64) -> bool) {
+        let bb = self.stack.last().unwrap();
+        let aa = self.stack.get(self.stack.len() - 2).unwrap();
+        if let (&Value::Number(b), &Value::Number(a)) = (bb, aa) {
             self.stack.pop();
             self.stack.pop();
-            self.stack.push(Value::Bool(op(a,b)))
+            self.stack.push(Value::Bool(op(a, b)))
         }
     }
-
 
     fn run(&mut self) -> InterpretResult {
         loop {
@@ -65,25 +74,25 @@ impl VM {
 
             print!("          ");
             for slot in self.stack.iter() {
-              print!("[ ");
-              slot.print();
-              print!(" ]");
+                print!("[ ");
+                slot.print();
+                print!(" ]");
             }
             println!();
-            
+
             self.chunk.disassemble_instruction(self.ip);
             match instruction {
                 OpCode::Constant { index } => {
                     let value = self.chunk.read_constant(index);
                     self.stack.push(value);
                 }
-                OpCode::Nil      => self.stack.push(Value::Nil),
-                OpCode::True     => self.stack.push(Value::Bool(true)),
-                OpCode::False    => self.stack.push(Value::Bool(false)),
-                OpCode::Pop      => { self.stack.pop(); }
-                OpCode::GetLocal { index } => {
-                    self.stack.push(self.stack[index].clone())
+                OpCode::Nil => self.stack.push(Value::Nil),
+                OpCode::True => self.stack.push(Value::Bool(true)),
+                OpCode::False => self.stack.push(Value::Bool(false)),
+                OpCode::Pop => {
+                    self.stack.pop();
                 }
+                OpCode::GetLocal { index } => self.stack.push(self.stack[index].clone()),
                 OpCode::SetLocal { index } => {
                     self.stack[index] = self.stack.last().unwrap().clone()
                 }
@@ -98,8 +107,7 @@ impl VM {
                                 self.runtime_error(&ss);
                                 return InterpretResult::RuntimeError;
                             }
-                            Some(v) => 
-                                self.stack.push(v.clone())
+                            Some(v) => self.stack.push(v.clone()),
                         }
                     }
                 }
@@ -107,7 +115,8 @@ impl VM {
                     let value = self.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
-                        self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone());
+                        self.memory
+                            .set_global(s.to_string(), self.stack.last().unwrap().clone());
                         self.stack.pop();
                     }
                 }
@@ -115,61 +124,62 @@ impl VM {
                     let value = self.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
-                        if self.memory.set_global(s.to_string(), self.stack.last().unwrap().clone()) {
+                        if self
+                            .memory
+                            .set_global(s.to_string(), self.stack.last().unwrap().clone())
+                        {
                             self.memory.delete_global(s.to_string());
                             self.runtime_error(&format!("Undefined variable '{}'.", s));
                             return InterpretResult::RuntimeError;
                         }
                     }
                 }
-                OpCode::Equal    => {
+                OpCode::Equal => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(a == b))
                 }
-                OpCode::Greater  => self.bool_op(|a, b| a > b),
-                OpCode::Less     => self.bool_op(|a, b| a < b),
-                OpCode::Add      =>{
-                    match (self.stack.last().unwrap().clone(), self.stack.get(self.stack.len()-2).unwrap().clone()) {
-                        (Value::Object(bref), Value::Object(aref)) => {
-                            match (aref, bref) {
-                                (ObjType::String(a), ObjType::String(b)) => {
+                OpCode::Greater => self.bool_op(|a, b| a > b),
+                OpCode::Less => self.bool_op(|a, b| a < b),
+                OpCode::Add => {
+                    match (
+                        self.stack.last().unwrap().clone(),
+                        self.stack.get(self.stack.len() - 2).unwrap().clone(),
+                    ) {
+                        (Value::Object(bref), Value::Object(aref)) => match (aref, bref) {
+                            (ObjType::String(a), ObjType::String(b)) => {
+                                self.stack.pop();
+                                self.stack.pop();
 
-                                    self.stack.pop();
-                                    self.stack.pop();
-        
-                                    let owned = format!("{}{}", a, b);
-                                    
-                                    self.stack.push(Value::Object(ObjType::String(owned)));
-                                }
+                                let owned = format!("{}{}", a, b);
+
+                                self.stack.push(Value::Object(ObjType::String(owned)));
                             }
-                        }
+                        },
                         (Value::Number(b), Value::Number(a)) => {
                             self.stack.pop();
                             self.stack.pop();
                             self.stack.push(Value::Number(a + b))
                         }
                         _ => {
-                            self.runtime_error(
-                                "Operands must be two numbers or two strings.");
+                            self.runtime_error("Operands must be two numbers or two strings.");
                             return InterpretResult::RuntimeError;
                         }
-
                     }
                 }
                 OpCode::Subtract => self.binary_op(|a, b| a - b),
                 OpCode::Multiply => self.binary_op(|a, b| a * b),
-                OpCode::Divide   => self.binary_op(|a, b| a / b),
-                OpCode::Not      => {
+                OpCode::Divide => self.binary_op(|a, b| a / b),
+                OpCode::Not => {
                     let v = self.stack.pop().unwrap();
                     self.stack.push(Value::Bool(self.is_falsey(v)))
                 }
-                OpCode::Negate   => {
+                OpCode::Negate => {
                     if let Value::Number(n) = self.stack.pop().unwrap() {
-                        self.stack.push(Value::Number( -n ));                        
+                        self.stack.push(Value::Number(-n));
                     } else {
                         self.runtime_error("Operand must be a number.");
-                        return InterpretResult::RuntimeError
+                        return InterpretResult::RuntimeError;
                     }
                 }
                 OpCode::Print => {
@@ -181,13 +191,17 @@ impl VM {
                     if self.is_falsey(x) {
                         self.ip += jump;
                     }
-                },
+                }
                 OpCode::Jump { jump } => {
                     self.ip += jump;
                 }
+                OpCode::Loop { jump } => {
+                    print!("{} - {}", self.ip, jump);
+                    self.ip -= jump;
+                }
                 OpCode::Return => {
                     // Exit interpreter.
-                    return InterpretResult::Ok
+                    return InterpretResult::Ok;
                 }
             }
             self.ip += 1
@@ -198,9 +212,7 @@ impl VM {
         eprintln!("{}", message);
         let line = self.chunk.line_at(self.ip);
         eprint!("[line {}] in script\n", line);
-      
+
         self.stack.clear();
-      }
-      
-    
+    }
 }
