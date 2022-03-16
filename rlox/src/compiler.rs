@@ -94,11 +94,13 @@ impl Scope {
     }
 
     fn end(&mut self) -> i32 {
+        self.depth -= 1;
+
         let mut count = 0;
         while self.locals.len() > 0 && self.locals.last().unwrap().depth > self.depth {
             count += 1;
+            self.locals.pop();
         }
-        self.depth -= 1;
         count
     }
 
@@ -575,8 +577,10 @@ impl Parser {
             self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
         }
 
-        self.scope.end();
-    }
+        for _ in 0..self.scope.end() {
+            self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        }
+}
 
     fn if_statement(&mut self) {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
