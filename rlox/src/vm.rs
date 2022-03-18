@@ -142,10 +142,8 @@ impl VM {
                 OpCode::Greater => self.bool_op(|a, b| a > b),
                 OpCode::Less => self.bool_op(|a, b| a < b),
                 OpCode::Add => {
-                    match (
-                        self.stack.last().unwrap().clone(),
-                        self.stack.get(self.stack.len() - 2).unwrap().clone(),
-                    ) {
+                    match (self.stack.last().unwrap().clone(),
+                            self.stack.get(self.stack.len() - 2).unwrap().clone()) {
                         (Value::Object(bref), Value::Object(aref)) => match (aref, bref) {
                             (ObjType::String(a), ObjType::String(b)) => {
                                 self.stack.pop();
@@ -155,6 +153,7 @@ impl VM {
 
                                 self.stack.push(Value::Object(ObjType::String(owned)));
                             }
+                            _ => self.runtime_error("Cannot concatenate")
                         },
                         (Value::Number(b), Value::Number(a)) => {
                             self.stack.pop();

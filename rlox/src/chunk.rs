@@ -28,7 +28,7 @@ pub enum OpCode {
     Not,
 }
 
-#[derive(Clone)]
+#[derive(Clone,Debug)]
 pub struct Chunk {
     pub code: Vec<OpCode>,
     values: Vec<Value>,

@@ -36,6 +36,7 @@ impl Memory {
             ObjType::String(r) => {
                 self.intern(r);
             }
+            _ => { /* ignore otherwise */ }
         }
     }
     pub fn intern(&mut self, obj: String) -> String {
