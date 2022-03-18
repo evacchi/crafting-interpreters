@@ -4,6 +4,7 @@ use chunk::Chunk;
 use chunk::OpCode;
 
 use memory::Memory;
+use object::Function;
 use object::ObjType;
 
 use scanner::Scanner;
@@ -134,62 +135,60 @@ impl Compiler {
             parser: Parser::new(source),
         }
     }
-    pub fn compile(&mut self) -> bool {
+    pub fn compile(&mut self) -> Option<&Function> {
         self.parser.advance();
 
         while !self.parser.matches(TokenType::Eof) {
             self.parser.declaration();
         }
 
-        self.parser.end(self.parser.previous.line);
-        !self.parser.had_error
+        if self.parser.had_error {
+            None
+        } else {
+            let f = self.parser.end(self.parser.previous.line);
+            Some(f)
+        }
     }
     pub fn state(self) -> (Chunk, Memory) {
         (
-            self.parser.emitter.current_chunk,
+            self.parser.emitter.function.chunk,
             self.parser.emitter.memory,
         )
     }
 }
 
 struct BytecodeEmitter {
-    current_chunk: Chunk,
+    function: Function,
     memory: Memory,
 }
 
 impl BytecodeEmitter {
     pub fn new() -> BytecodeEmitter {
         BytecodeEmitter {
-            current_chunk: Chunk::new(),
+            function: Function::main(),
             memory: Memory::new(),
         }
     }
 
+    pub fn chunk(&mut self) -> &mut Chunk {
+        &mut self.function.chunk
+    }
+
     pub fn emit_byte(&mut self, op: OpCode, line: usize) {
-        self.current_chunk.write(op, line);
+        self.chunk().write(op, line);
     }
 
     pub fn emit_bytes(&mut self, op1: OpCode, op2: OpCode, line: usize) {
-        self.current_chunk.write(op1, line);
-        self.current_chunk.write(op2, line);
+        self.chunk().write(op1, line);
+        self.chunk().write(op2, line);
     }
-
-    // pub fn emit_loop(&mut self, loopStart) {
-    //     self.emit_byte(OpCode::Loop, );
-
-    //     int offset = currentChunk()->count - loopStart + 2;
-    //     if (offset > UINT16_MAX) error("Loop body too large.");
-
-    //     emitByte((offset >> 8) & 0xff);
-    //     emitByte(offset & 0xff);
-    //   }
 
     pub fn emit_return(&mut self, line: usize) {
         self.emit_byte(OpCode::Return, line);
     }
 
     pub fn write_constant(&mut self, value: Value) -> usize {
-        self.current_chunk.write_constant(value)
+        self.chunk().write_constant(value)
     }
 
     pub fn emit_constant(&mut self, value: Value, line: usize) -> usize {
@@ -197,19 +196,19 @@ impl BytecodeEmitter {
             self.memory.push(o.clone());
         }
 
-        let index = self.current_chunk.write_constant(value);
+        let index = self.chunk().write_constant(value);
         self.emit_byte(OpCode::Constant { index }, line);
         index
     }
 
     pub fn patch_jump(&mut self, offset: usize) {
-        let new_jump = self.current_chunk.code.len() - 1 - offset;
-        let new_op = match self.current_chunk.code[offset] {
+        let new_jump = self.chunk().code.len() - 1 - offset;
+        let new_op = match self.chunk().code[offset] {
             OpCode::JumpIfFalse { jump: _ } => OpCode::JumpIfFalse { jump: new_jump },
             OpCode::Jump { jump: _ } => OpCode::Jump { jump: new_jump },
             op => panic!("Expected a Jump instruction! Found {:?}", op),
         };
-        self.current_chunk.code[offset] = new_op;
+        self.chunk().code[offset] = new_op;
     }
 }
 
@@ -351,10 +350,10 @@ impl Parser {
     fn or_(&mut self, _can_assign: bool) {
         self.emitter
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let else_jump = self.emitter.current_chunk.code.len() - 1;
+        let else_jump = self.emitter.chunk().code.len() - 1;
         self.emitter
             .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-        let end_jump = self.emitter.current_chunk.code.len() - 1;
+        let end_jump = self.emitter.chunk().code.len() - 1;
         self.emitter.patch_jump(else_jump);
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
         self.parse_precedence(Precedence::Or);
@@ -481,7 +480,7 @@ impl Parser {
     fn and_(&mut self, _can_assign: bool) {
         self.emitter
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let end_jump = self.emitter.current_chunk.code.len() - 1;
+        let end_jump = self.emitter.chunk().code.len() - 1;
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
         self.parse_precedence(Precedence::And);
         self.emitter.patch_jump(end_jump);
@@ -533,7 +532,7 @@ impl Parser {
             self.expression_statement();
         }
 
-        let mut loop_start = self.emitter.current_chunk.code.len();
+        let mut loop_start = self.emitter.chunk().code.len();
 
         let mut exit_jump = None;
 
@@ -544,7 +543,7 @@ impl Parser {
             // Jump out of the loop if the condition is false.
             self.emitter
                 .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-            exit_jump = Some(self.emitter.current_chunk.code.len() - 1);
+            exit_jump = Some(self.emitter.chunk().code.len() - 1);
 
             self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
         }
@@ -552,13 +551,13 @@ impl Parser {
         if !self.matches(TokenType::RightParen) {
             self.emitter
                 .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-            let body_jump = self.emitter.current_chunk.code.len() - 1;
+            let body_jump = self.emitter.chunk().code.len() - 1;
 
-            let increment_start = self.emitter.current_chunk.code.len() - 1;
+            let increment_start = self.emitter.chunk().code.len() - 1;
             self.expression();
             self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
 
-            let jump = self.emitter.current_chunk.code.len() - loop_start;
+            let jump = self.emitter.chunk().code.len() - loop_start;
             self.emitter
                 .emit_byte(OpCode::Loop { jump }, self.current.line);
 
@@ -568,7 +567,7 @@ impl Parser {
         }
 
         self.statement();
-        let jump = self.emitter.current_chunk.code.len() - loop_start;
+        let jump = self.emitter.chunk().code.len() - loop_start;
         self.emitter
             .emit_byte(OpCode::Loop { jump }, self.current.line);
 
@@ -589,13 +588,13 @@ impl Parser {
 
         self.emitter
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let then_jump = self.emitter.current_chunk.code.len() - 1;
+        let then_jump = self.emitter.chunk().code.len() - 1;
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
         self.statement();
 
         self.emitter
             .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-        let else_jump = self.emitter.current_chunk.code.len() - 1;
+        let else_jump = self.emitter.chunk().code.len() - 1;
 
         self.emitter.patch_jump(then_jump);
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
@@ -614,19 +613,19 @@ impl Parser {
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.emitter.current_chunk.code.len() - 1;
+        let loop_start = self.emitter.chunk().code.len() - 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         self.emitter
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let exit_jump = self.emitter.current_chunk.code.len() - 1;
+        let exit_jump = self.emitter.chunk().code.len() - 1;
 
         self.emitter.emit_byte(OpCode::Pop, self.current.line);
         self.statement();
 
-        let jump = self.emitter.current_chunk.code.len() - loop_start;
+        let jump = self.emitter.chunk().code.len() - loop_start;
         self.emitter
             .emit_byte(OpCode::Loop { jump }, self.current.line);
 
@@ -691,12 +690,14 @@ impl Parser {
         }
     }
 
-    pub fn end(&mut self, line: usize) {
+    pub fn end(&mut self, line: usize) -> &Function {
         self.emitter.emit_return(line);
         // debug statements
         if !self.had_error {
-            self.emitter.current_chunk.disassemble("code");
+            self.emitter.chunk().disassemble("code");
         }
+
+        &self.emitter.function
     }
 
     pub fn binary(&mut self, _can_assign: bool) {

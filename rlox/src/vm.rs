@@ -29,14 +29,15 @@ impl VM {
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
-        if !compiler.compile() {
+        if let Some(_f) = compiler.compile() {
+            let (chk, mem) = compiler.state();
+            self.chunk = chk;
+            self.memory = mem;
+            self.ip = 0;
+            self.run()
+        } else {
             return InterpretResult::CompileError;
         }
-        let (chk, mem) = compiler.state();
-        self.chunk = chk;
-        self.memory = mem;
-        self.ip = 0;
-        self.run()
     }
 
     fn is_falsey(&self, value: Value) -> bool {
