@@ -10,24 +10,22 @@ use value::Value;
 pub struct CallFrame {
     function: Function, // ptr would be better, but let's use a clone for now
     ip: usize,
-    slots: Vec<Value>
+    slot: usize
 }
 
 impl CallFrame {
-    fn new(function: Function, slots: Vec<Value>) -> CallFrame {
+    fn new(function: Function, slot: usize) -> CallFrame {
         CallFrame {
-            function: function,
+            function,
             ip: 0,
-            slots: slots//??
+            slot
         }
     }
 }
 
 pub struct VM {
-    chunk: Chunk,
-    ip: usize,
-    stack: Vec<Value>,
     frames: Vec<CallFrame>,
+    stack: Vec<Value>,
     memory: Memory,
 }
 
@@ -40,21 +38,17 @@ pub enum InterpretResult {
 impl VM {
     pub fn new() -> VM {
         VM {
-            chunk: Chunk::new(),
-            ip: 0,
-            stack: Vec::new(),
             frames: Vec::new(),
+            stack: Vec::new(),
             memory: Memory::new(),
         }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
         if let Some(function) = compiler.compile() {
-            let frame = CallFrame::new(function.clone(), self.stack.clone());
+            let frame = CallFrame::new(function.clone(), 0);
             let (chk, mem) = compiler.state();
-            self.chunk = chk;
             self.memory = mem;
-            self.ip = 0;
             self.frames.push(frame);
             self.run()
         } else {
@@ -95,7 +89,7 @@ impl VM {
     fn run(&mut self) -> InterpretResult {
         loop {
             let frame = self.frames.last_mut().unwrap();
-            let instruction = self.chunk.fetch(self.ip);
+            let instruction = frame.function.chunk.fetch(frame.ip);
 
             print!("          ");
             for slot in self.stack.iter() {
@@ -105,10 +99,10 @@ impl VM {
             }
             println!();
 
-            self.chunk.disassemble_instruction(self.ip);
+            frame.function.chunk.disassemble_instruction(frame.ip);
             match instruction {
                 OpCode::Constant { index } => {
-                    let value = self.chunk.read_constant(index);
+                    let value = frame.function.chunk.read_constant(index);
                     self.stack.push(value);
                 }
                 OpCode::Nil => self.stack.push(Value::Nil),
@@ -117,12 +111,15 @@ impl VM {
                 OpCode::Pop => {
                     self.stack.pop();
                 }
-                OpCode::GetLocal { index } => self.stack.push(frame.slots[index].clone()),
+                OpCode::GetLocal { index } => {
+                    println!("frame.slot {}, index {}", frame.slot, index);
+                    self.stack.push(self.stack[frame.slot + index-1].clone());
+                }
                 OpCode::SetLocal { index } => {
-                    frame.slots[index] = self.stack.last().unwrap().clone()
+                    self.stack[frame.slot + index-1] = self.stack.last().unwrap().clone()
                 }
                 OpCode::GetGlobal { index } => {
-                    let value = self.chunk.read_constant(index);
+                    let value = frame.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         let k = s.to_string();
@@ -137,7 +134,7 @@ impl VM {
                     }
                 }
                 OpCode::DefineGlobal { index } => {
-                    let value = self.chunk.read_constant(index);
+                    let value = frame.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         self.memory
@@ -146,7 +143,7 @@ impl VM {
                     }
                 }
                 OpCode::SetGlobal { index } => {
-                    let value = self.chunk.read_constant(index);
+                    let value = frame.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         if self
@@ -227,13 +224,14 @@ impl VM {
                     return InterpretResult::Ok;
                 }
             }
-            self.ip += 1
+            frame.ip += 1
         }
     }
 
     fn runtime_error(&mut self, message: &str) {
         eprintln!("{}", message);
-        let line = self.chunk.line_at(self.ip);
+        // let line = self.chunk.line_at(self.ip);
+        let line = -1;
         eprint!("[line {}] in script\n", line);
 
         self.stack.clear();

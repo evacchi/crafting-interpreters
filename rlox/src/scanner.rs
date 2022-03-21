@@ -59,6 +59,8 @@ pub enum TokenType {
 
     Error,
     Eof,
+
+    Undefined
 }
 
 #[derive(Debug)]
