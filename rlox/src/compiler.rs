@@ -84,10 +84,20 @@ pub struct Compiler {
 
 impl Scope {
     fn new() -> Scope {
-        Scope {
+        let mut s = Scope {
             locals: Vec::new(),
             depth: 0,
-        }
+        };
+        let l = Local {
+            name: Token {
+                tpe: TokenType::Undefined,
+                line: 0,
+                text: String::from("")
+            },
+            depth: 0
+        };
+        s.locals.push(l);
+        s
     }
 
     fn begin(&mut self) {
@@ -276,6 +286,7 @@ impl ParseRule {
             TokenType::While => ParseRule::new(Parser::err, Parser::err, Precedence::None),
             TokenType::Error => ParseRule::new(Parser::err, Parser::err, Precedence::None),
             TokenType::Eof => ParseRule::new(Parser::err, Parser::err, Precedence::None),
+            _ => ParseRule::new(Parser::err, Parser::err, Precedence::None)
         }
     }
 }
