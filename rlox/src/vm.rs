@@ -2,13 +2,32 @@ use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Compiler;
 use memory::Memory;
+use object::Function;
 use object::ObjType;
 use value::Value;
+
+#[derive(Clone)]
+pub struct CallFrame {
+    function: Function, // ptr would be better, but let's use a clone for now
+    ip: usize,
+    slots: Vec<Value>
+}
+
+impl CallFrame {
+    fn new(function: Function, slots: Vec<Value>) -> CallFrame {
+        CallFrame {
+            function: function,
+            ip: 0,
+            slots: slots//??
+        }
+    }
+}
 
 pub struct VM {
     chunk: Chunk,
     ip: usize,
     stack: Vec<Value>,
+    frames: Vec<CallFrame>,
     memory: Memory,
 }
 
@@ -24,23 +43,27 @@ impl VM {
             chunk: Chunk::new(),
             ip: 0,
             stack: Vec::new(),
+            frames: Vec::new(),
             memory: Memory::new(),
         }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let mut compiler = Compiler::new(source.to_string());
-        if let Some(_f) = compiler.compile() {
+        if let Some(function) = compiler.compile() {
+            let frame = CallFrame::new(function.clone(), self.stack.clone());
             let (chk, mem) = compiler.state();
             self.chunk = chk;
             self.memory = mem;
             self.ip = 0;
+            self.frames.push(frame);
             self.run()
         } else {
             return InterpretResult::CompileError;
         }
+
     }
 
-    fn is_falsey(&self, value: Value) -> bool {
+    fn is_falsey(value: Value) -> bool {
         match value {
             Value::Nil => true,
             Value::Bool(b) => !b,
@@ -71,6 +94,7 @@ impl VM {
 
     fn run(&mut self) -> InterpretResult {
         loop {
+            let frame = self.frames.last_mut().unwrap();
             let instruction = self.chunk.fetch(self.ip);
 
             print!("          ");
@@ -93,9 +117,9 @@ impl VM {
                 OpCode::Pop => {
                     self.stack.pop();
                 }
-                OpCode::GetLocal { index } => self.stack.push(self.stack[index].clone()),
+                OpCode::GetLocal { index } => self.stack.push(frame.slots[index].clone()),
                 OpCode::SetLocal { index } => {
-                    self.stack[index] = self.stack.last().unwrap().clone()
+                    frame.slots[index] = self.stack.last().unwrap().clone()
                 }
                 OpCode::GetGlobal { index } => {
                     let value = self.chunk.read_constant(index);
@@ -172,7 +196,7 @@ impl VM {
                 OpCode::Divide => self.binary_op(|a, b| a / b),
                 OpCode::Not => {
                     let v = self.stack.pop().unwrap();
-                    self.stack.push(Value::Bool(self.is_falsey(v)))
+                    self.stack.push(Value::Bool(VM::is_falsey(v)))
                 }
                 OpCode::Negate => {
                     if let Value::Number(n) = self.stack.pop().unwrap() {
@@ -188,15 +212,15 @@ impl VM {
                 }
                 OpCode::JumpIfFalse { jump } => {
                     let x = self.stack.last().unwrap().clone();
-                    if self.is_falsey(x) {
-                        self.ip += jump;
+                    if VM::is_falsey(x) {
+                        frame.ip += jump;
                     }
                 }
                 OpCode::Jump { jump } => {
-                    self.ip += jump;
+                    frame.ip += jump;
                 }
                 OpCode::Loop { jump } => {
-                    self.ip -= jump;
+                    frame.ip -= jump;
                 }
                 OpCode::Return => {
                     // Exit interpreter.
