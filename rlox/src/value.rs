@@ -16,7 +16,7 @@ impl Value {
             Value::Bool(b) => format!("{}", b),
             Value::Number(n) => format!("{}", n),
             Value::Object(ObjType::String(s)) => format!("{:?}", s),
-            Value::Object(ObjType::Function(Function{ arity,chunk:_,name })) => 
+            Value::Object(ObjType::Function(Function{ arity,name,.. })) => 
                 format!("{:?}/{:?}", name, arity),
         };
         print!("{}", s);

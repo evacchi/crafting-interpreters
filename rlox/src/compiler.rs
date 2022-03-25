@@ -5,6 +5,7 @@ use chunk::OpCode;
 
 use memory::Memory;
 use object::Function;
+use object::FunctionType;
 use object::ObjType;
 
 use scanner::Scanner;
@@ -121,6 +122,9 @@ impl Scope {
     }
 
     fn mark_initialized(&mut self) {
+        if self.depth == 0 {
+            return;
+        }
         let lastidx = self.locals.len() - 1;
         self.locals[lastidx].depth = self.depth;
     }
@@ -145,7 +149,7 @@ impl Compiler {
             parser: Parser::new(source),
         }
     }
-    pub fn compile(&mut self) -> Option<&Function> {
+    pub fn compile(&mut self) -> Option<Function> {
         self.parser.advance();
 
         while !self.parser.matches(TokenType::Eof) {
@@ -155,7 +159,8 @@ impl Compiler {
         if self.parser.had_error {
             None
         } else {
-            let f = self.parser.end(self.parser.previous.line);
+            self.parser.end(self.parser.previous.line);
+            let f = self.parser.emitter.function;
             Some(f)
         }
     }
@@ -168,7 +173,7 @@ impl Compiler {
 }
 
 struct BytecodeEmitter {
-    function: Function,
+    pub function: Function,
     memory: Memory,
 }
 
@@ -509,6 +514,30 @@ impl Parser {
         self.consume(TokenType::RightBrace, "Expect '}' after block.");
     }
 
+    fn function(&mut self, ftype: FunctionType) {
+        let mut compiler = Compiler::new(String::from(""));
+        self.scope.begin(); 
+        
+        self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+        self.consume(TokenType::RightParen, "Expect ')' after parameters.");
+        self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
+        self.block();
+
+        compiler.parser.end(self.current.line);
+        let function = compiler.parser.emitter.function;
+        let ftype = ObjType::Function(function);
+        let value = Value::Object(ftype);
+        self.emitter.emit_constant(value, self.current.line);
+
+    }
+
+    fn fun_declaration(&mut self) {
+        let global = self.parse_variable("Expect function name.");
+        self.scope.mark_initialized();
+        self.function(FunctionType::Function);
+        self.define_variable(global);
+    }
+
     fn var_declaration(&mut self) {
         let global = self.parse_variable("Expect variable name.");
 
@@ -590,7 +619,7 @@ impl Parser {
         for _ in 0..self.scope.end() {
             self.emitter.emit_byte(OpCode::Pop, self.current.line);
         }
-}
+    }
 
     fn if_statement(&mut self) {
         self.consume(TokenType::LeftParen, "Expect '(' after 'if'.");
@@ -670,7 +699,9 @@ impl Parser {
     }
 
     pub fn declaration(&mut self) {
-        if self.matches(TokenType::Var) {
+        if self.matches(TokenType::Fun) {
+            self.fun_declaration();
+        } else if self.matches(TokenType::Var) {
             self.var_declaration();
         } else {
             self.statement();
@@ -701,14 +732,12 @@ impl Parser {
         }
     }
 
-    pub fn end(&mut self, line: usize) -> &Function {
+    pub fn end(&mut self, line: usize) {
         self.emitter.emit_return(line);
         // debug statements
         if !self.had_error {
             self.emitter.chunk().disassemble("code");
         }
-
-        &self.emitter.function
     }
 
     pub fn binary(&mut self, _can_assign: bool) {
