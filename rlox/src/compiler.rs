@@ -197,6 +197,7 @@ impl BytecodeEmitter {
     }
 
     pub fn emit_return(&mut self, line: usize) {
+        self.emit_byte(OpCode::Nil, line);
         self.emit_byte(OpCode::Return, line);
     }
 
@@ -491,7 +492,7 @@ impl Parser {
             .emit_byte(OpCode::DefineGlobal { index }, self.current.line);
     }
 
-    fn argument_list(&mut self) -> usize {
+    fn argument_list(&mut self) -> u32 {
         let mut argc = 0;
         if !self.check(TokenType::RightParen) {
             loop {
@@ -532,6 +533,18 @@ impl Parser {
         self.scope.begin(); 
         
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
+
+
+        if !self.check(TokenType::RightParen) {
+            loop {
+                self.emitter.function.arity += 1;
+                // if arity>N error
+                let constant = self.parse_variable("Expect parameter name.");
+                self.define_variable(constant);
+                if !self.matches(TokenType::Comma) { break; }
+            }
+        }
+
         self.consume(TokenType::RightParen, "Expect ')' after parameters.");
         self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
         self.block();
@@ -786,7 +799,7 @@ impl Parser {
 
     pub fn call(&mut self, _can_assign: bool) {
         let argc = self.argument_list();
-        self.emitter.emit_byte(OpCode::Call{ arity: argc }, self.current.line);
+        self.emitter.emit_byte(OpCode::Call{ argc }, self.current.line);
     }      
 
     pub fn literal(&mut self, _can_assign: bool) {

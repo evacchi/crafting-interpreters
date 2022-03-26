@@ -20,7 +20,7 @@ pub enum OpCode {
     Jump { jump: usize },
     JumpIfFalse { jump: usize },
     Loop { jump: usize },
-    Call { arity: usize },
+    Call { argc: u32 },
     Return,
     Add,
     Subtract,

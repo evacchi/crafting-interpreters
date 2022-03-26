@@ -90,6 +90,8 @@ impl VM {
 
     fn run(&mut self) -> InterpretResult {
         loop {
+            let mut no_push = false;
+            let mut new_frame = false;
             let mut frame = self.frames.pop().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
 
@@ -221,12 +223,24 @@ impl VM {
                 OpCode::Loop { jump } => {
                     frame.ip -= jump;
                 }
-                OpCode::Call { arity } => {
-                    let value = self.stack.last().unwrap();
+                OpCode::Call { argc } => {
+                    let up = self.stack.len() - 1;
+                    let a = argc as usize;
+                    let offset = up - a;
+                    let args = &self.stack[offset..up+1];
+                    let value = args[0].clone();
                     if let Value::Object(ObjType::Function(f)) = value {
-                        self.frames.push(frame);
-                        frame = CallFrame::new(f.clone(), 0)
+                        if argc == f.arity {
+                            new_frame = true;
+                            self.frames.push(frame);
+                            frame = CallFrame::new(f.clone(), up)                                
+                        } else {
+                            self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
+                        }
+                        // { fun f() {print(1);} f(); }
+                        // { fun f(a) {print(1);} f(222); }
                     } else {
+                        println!("FOUND:: {:?}", args);
                         self.runtime_error("Can only call functions and classes");
                         return InterpretResult::RuntimeError;
                 }
@@ -234,12 +248,27 @@ impl VM {
                     // frame = &vm.frames[vm.frameCount - 1];
                 }
                 OpCode::Return => {
-                    // Exit interpreter.
-                    return InterpretResult::Ok;
+                    match self.stack.pop() {
+                        Some(result) => {
+                            self.frames.pop();
+                            if self.frames.len() == 0 {
+                                self.stack.pop();
+                                // Exit interpreter.
+                                return InterpretResult::Ok;
+                            }
+                            no_push=true;
+                            self.stack.push(result);        
+                        }
+                        None => {}
+                    }
                 }
             }
-            frame.ip += 1;
-            self.frames.push(frame)
+            if !new_frame {
+                frame.ip += 1;
+            }
+            if !no_push {
+                self.frames.push(frame)
+            }
         }
     }
 

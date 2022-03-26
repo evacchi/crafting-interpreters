@@ -7,14 +7,14 @@ pub enum FunctionType {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    pub arity: i32,
+    pub arity: u32,
     pub chunk: Chunk,
     pub name: Option<String>,
     pub tpe: FunctionType
 }
 
 impl Function {
-    pub fn named(arity: i32, name: String) -> Function {
+    pub fn named(arity: u32, name: String) -> Function {
         Function {
             arity,
             chunk: Chunk::new(),
