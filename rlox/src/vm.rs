@@ -221,6 +221,18 @@ impl VM {
                 OpCode::Loop { jump } => {
                     frame.ip -= jump;
                 }
+                OpCode::Call { arity } => {
+                    let value = self.stack.last().unwrap();
+                    if let Value::Object(ObjType::Function(f)) = value {
+                        self.frames.push(frame);
+                        frame = CallFrame::new(f.clone(), 0)
+                    } else {
+                        self.runtime_error("Can only call functions and classes");
+                        return InterpretResult::RuntimeError;
+                }
+        
+                    // frame = &vm.frames[vm.frameCount - 1];
+                }
                 OpCode::Return => {
                     // Exit interpreter.
                     return InterpretResult::Ok;

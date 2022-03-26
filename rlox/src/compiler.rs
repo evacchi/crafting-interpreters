@@ -237,7 +237,7 @@ impl ParseRule {
     fn of_token(tpe: &TokenType) -> ParseRule {
         match tpe {
             TokenType::Start => ParseRule::new(Parser::err, Parser::err, Precedence::None),
-            TokenType::LeftParen => ParseRule::new(Parser::grouping, Parser::err, Precedence::None),
+            TokenType::LeftParen => ParseRule::new(Parser::grouping, Parser::call, Precedence::Call),
             TokenType::RightParen => ParseRule::new(Parser::err, Parser::err, Precedence::None),
             TokenType::LeftBrace => ParseRule::new(Parser::err, Parser::err, Precedence::None),
             TokenType::RightBrace => ParseRule::new(Parser::err, Parser::err, Precedence::None),
@@ -489,6 +489,19 @@ impl Parser {
 
         self.emitter
             .emit_byte(OpCode::DefineGlobal { index }, self.current.line);
+    }
+
+    fn argument_list(&mut self) -> usize {
+        let mut argc = 0;
+        if !self.check(TokenType::RightParen) {
+            loop {
+                self.expression();
+                argc += 1;
+                if !self.matches(TokenType::Comma) { break; }
+            } 
+        }
+        self.consume(TokenType::RightParen, "Expect ')' after arguments.");
+        return argc;
     }
 
     fn and_(&mut self, _can_assign: bool) {
@@ -770,6 +783,11 @@ impl Parser {
             _ => {} // Unreachable.
         }
     }
+
+    pub fn call(&mut self, _can_assign: bool) {
+        let argc = self.argument_list();
+        self.emitter.emit_byte(OpCode::Call{ arity: argc }, self.current.line);
+    }      
 
     pub fn literal(&mut self, _can_assign: bool) {
         let tok = self.previous.clone();

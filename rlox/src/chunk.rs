@@ -20,6 +20,7 @@ pub enum OpCode {
     Jump { jump: usize },
     JumpIfFalse { jump: usize },
     Loop { jump: usize },
+    Call { arity: usize },
     Return,
     Add,
     Subtract,
@@ -109,6 +110,7 @@ impl Chunk {
             }
             OpCode::Jump { jump } => self.jump_instruction("OP_JUMP", 1, offset + 1, jump),
             OpCode::Loop { jump } => self.jump_instruction("OP_LOOP", -1, offset + 1, jump),
+            OpCode::Call { .. } => self.simple_instruction("OP_CALL"),
             OpCode::Return => self.simple_instruction("RETURN"),
         }
     }
