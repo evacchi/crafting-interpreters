@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use object::ObjType;
 use value::Value;
 
+#[derive(Clone)]
 pub struct Memory {
     objects: Vec<ObjType>,
     globals: HashMap<String, Value>,

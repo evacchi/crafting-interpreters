@@ -1,5 +1,6 @@
 use chunk::Chunk;
 use chunk::OpCode;
+use compiler::Parser;
 use compiler::Compiler;
 use memory::Memory;
 use object::Function;
@@ -44,11 +45,12 @@ impl VM {
         }
     }
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
-        let mut compiler = Compiler::new(source.to_string());
+        let parser = &mut Parser::new(source.to_string());
+        let mut compiler = Compiler::new(parser);
         if let Some(function) = compiler.compile() {
             let frame = CallFrame::new(function.clone(), 0);
-            let (chk, mem) = compiler.state();
-            self.memory = mem;
+            let emitter = compiler.state();
+            self.memory = emitter.memory;
             self.frames.push(frame);
             self.run()
         } else {

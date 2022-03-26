@@ -58,7 +58,7 @@ struct ParseRule {
     precedence: Precedence,
 }
 
-struct Parser {
+pub struct Parser {
     scanner: Scanner,
     current: Token,
     previous: Token,
@@ -79,8 +79,8 @@ struct Scope {
     depth: i32,
 }
 
-pub struct Compiler {
-    parser: Parser,
+pub struct Compiler<'a> {
+    parser: &'a mut Parser,
 }
 
 impl Scope {
@@ -143,10 +143,10 @@ impl Scope {
     }
 }
 
-impl Compiler {
-    pub fn new(source: String) -> Compiler {
+impl <'a> Compiler<'a> {
+    pub fn new(parser: &'a mut Parser) -> Compiler<'a> {
         Compiler {
-            parser: Parser::new(source),
+            parser
         }
     }
     pub fn compile(&mut self) -> Option<Function> {
@@ -160,21 +160,19 @@ impl Compiler {
             None
         } else {
             self.parser.end(self.parser.previous.line);
-            let f = self.parser.emitter.function;
+            let f = self.parser.emitter.function.clone();
             Some(f)
         }
     }
-    pub fn state(self) -> (Chunk, Memory) {
-        (
-            self.parser.emitter.function.chunk,
-            self.parser.emitter.memory,
-        )
+    pub fn state(self) -> BytecodeEmitter {
+        self.parser.emitter.clone()
     }
 }
 
-struct BytecodeEmitter {
+#[derive(Clone)]
+pub struct BytecodeEmitter {
     pub function: Function,
-    memory: Memory,
+    pub memory: Memory,
 }
 
 impl BytecodeEmitter {
@@ -515,7 +513,9 @@ impl Parser {
     }
 
     fn function(&mut self, ftype: FunctionType) {
-        let mut compiler = Compiler::new(String::from(""));
+        let emitter = BytecodeEmitter::new();
+        let old_emitter = self.emitter.clone();
+        self.emitter = emitter;
         self.scope.begin(); 
         
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
@@ -523,8 +523,12 @@ impl Parser {
         self.consume(TokenType::LeftBrace, "Expect '{' before function body.");
         self.block();
 
-        compiler.parser.end(self.current.line);
-        let function = compiler.parser.emitter.function;
+        self.end(self.current.line);
+
+        let emitter = self.emitter.clone();
+        self.emitter = old_emitter;
+
+        let function = emitter.function;
         let ftype = ObjType::Function(function);
         let value = Value::Object(ftype);
         self.emitter.emit_constant(value, self.current.line);
