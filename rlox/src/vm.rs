@@ -259,7 +259,9 @@ impl VM {
                             no_push=true;
                             self.stack.push(result);        
                         }
-                        None => {}
+                        None => {
+                            
+                        }
                     }
                 }
             }

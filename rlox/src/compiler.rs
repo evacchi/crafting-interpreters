@@ -74,6 +74,7 @@ struct Local {
     depth: i32,
 }
 
+#[derive(Debug, Clone)]
 struct Scope {
     locals: Vec<Local>,
     depth: i32,
@@ -483,6 +484,7 @@ impl Parser {
     }
 
     fn define_variable(&mut self, index: usize) {
+        println!("SELF.SCOPE: {}", self.scope.depth);
         if self.scope.depth > 0 {
             self.scope.mark_initialized();
             return;
@@ -528,8 +530,12 @@ impl Parser {
 
     fn function(&mut self, ftype: FunctionType) {
         let emitter = BytecodeEmitter::new();
+        let scope = Scope::new();
         let old_emitter = self.emitter.clone();
+        let old_scope = self.scope.clone();
         self.emitter = emitter;
+        self.scope = scope;
+
         self.scope.begin(); 
         
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
@@ -553,6 +559,7 @@ impl Parser {
 
         let emitter = self.emitter.clone();
         self.emitter = old_emitter;
+        self.scope = old_scope;
 
         let function = emitter.function;
         let ftype = ObjType::Function(function);
