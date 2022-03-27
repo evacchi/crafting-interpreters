@@ -90,9 +90,7 @@ impl VM {
 
     fn run(&mut self) -> InterpretResult {
         loop {
-            let mut no_push = false;
-            let mut new_frame = false;
-            let mut frame = self.frames.pop().unwrap();
+            let mut frame = self.frames.last_mut().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
 
             print!("          ");
@@ -104,6 +102,9 @@ impl VM {
             println!();
 
             frame.function.chunk.disassemble_instruction(frame.ip);
+
+            frame.ip += 1;
+
             match instruction {
                 OpCode::Constant { index } => {
                     let value = frame.function.chunk.read_constant(index);
@@ -231,9 +232,9 @@ impl VM {
                     let value = args[0].clone();
                     if let Value::Object(ObjType::Function(f)) = value {
                         if argc == f.arity {
-                            new_frame = true;
-                            self.frames.push(frame);
-                            frame = CallFrame::new(f.clone(), up)                                
+                            // self.frames.push(frame);
+                            // frame = CallFrame::new(f.clone(), up)                                
+                            self.frames.push(CallFrame::new(f.clone(), up));                          
                         } else {
                             self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                         }
@@ -256,7 +257,6 @@ impl VM {
                                 // Exit interpreter.
                                 return InterpretResult::Ok;
                             }
-                            no_push=true;
                             self.stack.push(result);        
                         }
                         None => {
@@ -264,12 +264,6 @@ impl VM {
                         }
                     }
                 }
-            }
-            if !new_frame {
-                frame.ip += 1;
-            }
-            if !no_push {
-                self.frames.push(frame)
             }
         }
     }
