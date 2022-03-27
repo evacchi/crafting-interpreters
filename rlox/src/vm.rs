@@ -90,7 +90,7 @@ impl VM {
 
     fn run(&mut self) -> InterpretResult {
         loop {
-            let mut frame = self.frames.last_mut().unwrap();
+            let frame = self.frames.last_mut().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
 
             print!("          ");
@@ -117,7 +117,6 @@ impl VM {
                     self.stack.pop();
                 }
                 OpCode::GetLocal { index } => {
-                    println!("frame.slot {}, index {}", frame.slot, index);
                     self.stack.push(self.stack[frame.slot + index-1].clone());
                 }
                 OpCode::SetLocal { index } => {
@@ -175,9 +174,7 @@ impl VM {
                             (ObjType::String(a), ObjType::String(b)) => {
                                 self.stack.pop();
                                 self.stack.pop();
-
                                 let owned = format!("{}{}", a, b);
-
                                 self.stack.push(Value::Object(ObjType::String(owned)));
                             }
                             _ => self.runtime_error("Cannot concatenate")
@@ -232,36 +229,24 @@ impl VM {
                     let value = args[0].clone();
                     if let Value::Object(ObjType::Function(f)) = value {
                         if argc == f.arity {
-                            // self.frames.push(frame);
-                            // frame = CallFrame::new(f.clone(), up)                                
                             self.frames.push(CallFrame::new(f.clone(), up));                          
                         } else {
                             self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                         }
-                        // { fun f() {print(1);} f(); }
-                        // { fun f(a) {print(1);} f(222); }
                     } else {
-                        println!("FOUND:: {:?}", args);
                         self.runtime_error("Can only call functions and classes");
                         return InterpretResult::RuntimeError;
-                }
-        
-                    // frame = &vm.frames[vm.frameCount - 1];
+                    }    
                 }
                 OpCode::Return => {
-                    match self.stack.pop() {
-                        Some(result) => {
-                            self.frames.pop();
-                            if self.frames.len() == 0 {
-                                self.stack.pop();
-                                // Exit interpreter.
-                                return InterpretResult::Ok;
-                            }
-                            self.stack.push(result);        
+                    if let Some(result) = self.stack.pop() {
+                        self.frames.pop();
+                        if self.frames.len() == 0 {
+                            self.stack.pop();
+                            // Exit interpreter.
+                            return InterpretResult::Ok;
                         }
-                        None => {
-                            
-                        }
+                        self.stack.push(result);        
                     }
                 }
             }
