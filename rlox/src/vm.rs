@@ -59,6 +59,8 @@ impl VM {
             let frame = CallFrame::new(function.clone(), 0);
             let emitter = compiler.state();
             self.memory = emitter.memory;
+            // FIXME ensure native functions are defined because memory is being overwrittend
+            self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
             self.frames.push(frame);
             self.run()
         } else {
@@ -97,8 +99,6 @@ impl VM {
     }
 
     fn run(&mut self) -> InterpretResult {
-        self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
-
         loop {
             let frame = self.frames.last_mut().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
@@ -284,6 +284,5 @@ impl VM {
 
     fn define_native(&mut self, fun: Native) {
         self.memory.set_global(fun.name.to_string(), Value::Object(ObjType::NativeFn(fun)));
-        println!("{:?}", self.memory.globals);
     }
 }
