@@ -5,6 +5,7 @@ use compiler::Compiler;
 use memory::Memory;
 use object::Function;
 use object::ObjType;
+use object::Native;
 use value::Value;
 
 #[derive(Clone)]
@@ -44,6 +45,13 @@ impl VM {
             memory: Memory::new(),
         }
     }
+
+    fn native_clock(_args: &[Value]) -> Value {
+        let t = std::time::SystemTime::now();
+        let elapsed = t.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as f64;
+        Value::Number(elapsed)
+    }
+
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let parser = &mut Parser::new(source.to_string());
         let mut compiler = Compiler::new(parser);
@@ -89,6 +97,8 @@ impl VM {
     }
 
     fn run(&mut self) -> InterpretResult {
+        self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
+
         loop {
             let frame = self.frames.last_mut().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
@@ -226,17 +236,27 @@ impl VM {
                     let a = argc as usize;
                     let offset = up - a;
                     let args = &self.stack[offset..up+1];
-                    let value = args[0].clone();
-                    if let Value::Object(ObjType::Function(f)) = value {
-                        if argc == f.arity {
-                            self.frames.push(CallFrame::new(f.clone(), up));                          
-                        } else {
-                            self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
+                    let callee = args[0].clone();
+
+                    match callee {
+                        Value::Object(ObjType::Function(f)) => 
+                            if argc == f.arity {
+                                self.frames.push(CallFrame::new(f.clone(), up));                          
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
+                            }
+                        Value::Object(ObjType::NativeFn(f)) =>
+                            if argc == f.arity {
+                                let result = (f.fun)(args);
+                                self.stack.push(result);                 
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
+                            }
+                        _ => {
+                            self.runtime_error("Can only call functions and classes");
+                            return InterpretResult::RuntimeError;
                         }
-                    } else {
-                        self.runtime_error("Can only call functions and classes");
-                        return InterpretResult::RuntimeError;
-                    }    
+                    }
                 }
                 OpCode::Return => {
                     if let Some(result) = self.stack.pop() {
@@ -260,5 +280,10 @@ impl VM {
         eprint!("[line {}] in script\n", line);
 
         self.stack.clear();
+    }
+
+    fn define_native(&mut self, fun: Native) {
+        self.memory.set_global(fun.name.to_string(), Value::Object(ObjType::NativeFn(fun)));
+        println!("{:?}", self.memory.globals);
     }
 }
