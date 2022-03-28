@@ -64,7 +64,6 @@ pub struct Parser {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    emitter: BytecodeEmitter,
     scope: Scope,
 }
 
@@ -74,10 +73,11 @@ struct Local {
     depth: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 struct Scope {
     locals: Vec<Local>,
     depth: i32,
+    emitter: BytecodeEmitter,
 }
 
 pub struct Compiler<'a> {
@@ -89,6 +89,7 @@ impl Scope {
         let mut s = Scope {
             locals: Vec::new(),
             depth: 0,
+            emitter: BytecodeEmitter::new(),
         };
         let l = Local {
             name: Token {
@@ -327,13 +328,12 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
-            emitter: BytecodeEmitter::new(),
             scope: Scope::new(),
         }
     }
 
     pub fn emitter(&mut self) -> &mut BytecodeEmitter {
-        &mut self.emitter
+        &mut self.scope.emitter
     }
 
     pub fn advance(&mut self) {
@@ -546,7 +546,7 @@ impl Parser {
 
     fn and_(&mut self, _can_assign: bool) {
         let l = self.current.line;
-        self.emitter
+        self.emitter()
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
         let end_jump = self.emitter().chunk().code.len() - 1;
         self.emitter().emit_byte(OpCode::Pop, l);
@@ -572,7 +572,6 @@ impl Parser {
         let scope = Scope::new();
         let old_emitter = self.emitter().clone();
         let old_scope = self.scope.clone();
-        self.emitter = emitter;
         self.scope = scope;
 
         self.scope.begin(); 
@@ -597,7 +596,6 @@ impl Parser {
         self.end(self.current.line);
 
         let emitter = self.emitter().clone();
-        self.emitter = old_emitter;
         self.scope = old_scope;
 
         let function = emitter.function;
@@ -691,8 +689,9 @@ impl Parser {
 
         self.statement();
         let jump = self.emitter().chunk().code.len() - loop_start;
-        self.emitter
-            .emit_byte(OpCode::Loop { jump }, self.current.line);
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::Loop { jump }, l);
 
         if let Some(jump) = exit_jump {
             let l = self.current.line;        
@@ -712,14 +711,14 @@ impl Parser {
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
         let l = self.current.line;
-        self.emitter
+        self.emitter()
             .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
         let then_jump = self.emitter().chunk().code.len() - 1;
         self.emitter().emit_byte(OpCode::Pop, l);
         self.statement();
 
         let l = self.current.line;
-        self.emitter
+        self.emitter()
             .emit_byte(OpCode::Jump { jump: 0xFF }, l);
         let else_jump = self.emitter().chunk().code.len() - 1;
 
@@ -761,8 +760,9 @@ impl Parser {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
-        self.emitter
-            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
+        let l = self.current.line;        
+        self.emitter()
+            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
         let exit_jump = self.emitter().chunk().code.len() - 1;
 
         let l = self.current.line;
@@ -772,7 +772,7 @@ impl Parser {
         self.statement();
 
         let jump = self.emitter().chunk().code.len() - loop_start;
-        self.emitter
+        self.emitter()
             .emit_byte(OpCode::Loop { jump }, l);
 
         self.emitter().patch_jump(exit_jump);
