@@ -258,6 +258,14 @@ impl VM {
                         }
                     }
                 }
+                OpCode::Closure {index} => {
+                    let f = frame.function.chunk.read_constant(index);
+                    if let Value::Object(ObjType::Function(..)) = f {
+                        self.stack.push(f);
+                    } else {
+                        panic!("I was expecting a function.");
+                    }
+                }
                 OpCode::Return => {
                     if let Some(result) = self.stack.pop() {
                         self.frames.pop();

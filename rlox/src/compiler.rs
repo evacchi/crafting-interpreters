@@ -382,11 +382,16 @@ impl Parser {
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) {
-        let result = self.scope.resolve_local(name);
-        if can_assign && self.matches(TokenType::Equal) {
-            self.expression();
-            match result {
-                Ok(optindex) => {
+
+        // let cons: fn (usize) -> OpCode;
+
+
+
+        match self.scope.resolve_local(name) {
+            Err(msg) => self.error(msg),
+            Ok(optindex) => {
+                if can_assign && self.matches(TokenType::Equal) {
+                    self.expression();
                     let op = match optindex {
                         Some(index) => OpCode::SetLocal { index },
                         None => OpCode::SetGlobal {
@@ -394,12 +399,7 @@ impl Parser {
                         },
                     };
                     self.emitter.emit_byte(op, self.current.line);
-                }
-                Err(msg) => self.error(msg),
-            }
-        } else {
-            match result {
-                Ok(optindex) => {
+                } else {
                     let op = match optindex {
                         Some(index) => OpCode::GetLocal { index },
                         None => OpCode::GetGlobal {
@@ -408,7 +408,6 @@ impl Parser {
                     };
                     self.emitter.emit_byte(op, self.current.line);
                 }
-                Err(msg) => self.error(msg),
             }
         }
     }
