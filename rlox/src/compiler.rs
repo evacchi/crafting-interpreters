@@ -64,7 +64,7 @@ pub struct Parser {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    scope: Scope,
+    scope: Vec<Scope>,
 }
 
 #[derive(Debug, Clone)]
@@ -328,12 +328,16 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
-            scope: Scope::new(),
+            scope: vec![Scope::new()],
         }
     }
 
+    pub fn scope(&mut self) -> &mut Scope {
+        self.scope.last_mut().unwrap()
+    }
+
     pub fn emitter(&mut self) -> &mut BytecodeEmitter {
-        &mut self.scope.emitter
+        &mut self.scope().emitter
     }
 
     pub fn advance(&mut self) {
@@ -408,7 +412,7 @@ impl Parser {
         let cons_set: fn (usize) -> OpCode;
 
         let arg;
-        match self.scope.resolve_local(name) {
+        match self.scope().resolve_local(name) {
             Err(msg) => {
                 self.error(msg);
                 return;
@@ -419,7 +423,7 @@ impl Parser {
                 cons_set = |index| OpCode::SetLocal { index };
             }
             Ok(None) => {
-                match self.scope.resolve_upvalue(name) {
+                match self.scope().resolve_upvalue(name) {
                     Err(msg) => {
                         self.error(msg);
                         return;
@@ -492,13 +496,13 @@ impl Parser {
     }
 
     fn declare_variable(&mut self) {
-        if self.scope.depth == 0 {
+        if self.scope().depth == 0 {
             return;
         }
         let name = self.previous.clone();
-        let iter = &self.scope.locals.clone();
+        let iter = &self.scope().locals.clone();
         for local in iter.iter().rev() {
-            if local.depth != -1 && local.depth < self.scope.depth {
+            if local.depth != -1 && local.depth < self.scope().depth {
                 break;
             }
             if name.text == local.name.text {
@@ -506,14 +510,14 @@ impl Parser {
             }
         }
 
-        self.scope.add_local(name);
+        self.scope().add_local(name);
     }
 
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::Identifier, err);
 
         self.declare_variable();
-        if self.scope.depth > 0 {
+        if self.scope().depth > 0 {
             return 0;
         }
 
@@ -521,8 +525,8 @@ impl Parser {
     }
 
     fn define_variable(&mut self, index: usize) {
-        if self.scope.depth > 0 {
-            self.scope.mark_initialized();
+        if self.scope().depth > 0 {
+            self.scope().mark_initialized();
             return;
         }
 
@@ -569,12 +573,9 @@ impl Parser {
     fn function(&mut self, ftype: FunctionType) {
         let mut emitter = BytecodeEmitter::new();
         emitter.function.tpe = ftype;
-        let scope = Scope::new();
-        let old_emitter = self.emitter().clone();
-        let old_scope = self.scope.clone();
-        self.scope = scope;
+        self.scope.push(Scope::new());
 
-        self.scope.begin(); 
+        self.scope().begin(); 
         
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
 
@@ -595,8 +596,7 @@ impl Parser {
 
         self.end(self.current.line);
 
-        let emitter = self.emitter().clone();
-        self.scope = old_scope;
+        self.scope.pop();
 
         let function = emitter.function;
         let ftype = ObjType::Function(function);
@@ -608,7 +608,7 @@ impl Parser {
 
     fn fun_declaration(&mut self) {
         let global = self.parse_variable("Expect function name.");
-        self.scope.mark_initialized();
+        self.scope().mark_initialized();
         self.function(FunctionType::Function);
         self.define_variable(global);
     }
@@ -638,7 +638,7 @@ impl Parser {
     }
 
     fn for_statement(&mut self) {
-        self.scope.begin();
+        self.scope().begin();
 
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
         if self.matches(TokenType::Semicolon) {
@@ -699,7 +699,7 @@ impl Parser {
             self.emitter().emit_byte(OpCode::Pop, l); // Condition.
         }
 
-        for _ in 0..self.scope.end() {
+        for _ in 0..self.scope().end() {
             let l = self.current.line;
             self.emitter().emit_byte(OpCode::Pop, l);
         }
@@ -830,10 +830,10 @@ impl Parser {
         } else if self.matches(TokenType::While) {
             self.while_statement();
         } else if self.matches(TokenType::LeftBrace) {
-            self.scope.begin();
+            self.scope().begin();
             self.block();
             let l = self.current.line;
-            for _ in 0..self.scope.end() {
+            for _ in 0..self.scope().end() {
                 self.emitter().emit_byte(OpCode::Pop, l);
             }
         } else {
