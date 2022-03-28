@@ -64,7 +64,7 @@ pub struct Parser {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    scope: Vec<Scope>,
+    scope: Scope,
 }
 
 #[derive(Debug, Clone)]
@@ -74,49 +74,13 @@ struct Local {
 }
 
 #[derive(Clone)]
-struct Scope {
+struct ScopeCell {
     locals: Vec<Local>,
     depth: i32,
     emitter: BytecodeEmitter,
 }
 
-pub struct Compiler<'a> {
-    parser: &'a mut Parser,
-}
-
-impl Scope {
-    fn new() -> Scope {
-        let mut s = Scope {
-            locals: Vec::new(),
-            depth: 0,
-            emitter: BytecodeEmitter::new(),
-        };
-        let l = Local {
-            name: Token {
-                tpe: TokenType::Undefined,
-                line: 0,
-                text: String::from("")
-            },
-            depth: 0
-        };
-        s.locals.push(l);
-        s
-    }
-
-    fn begin(&mut self) {
-        self.depth += 1;
-    }
-
-    fn end(&mut self) -> i32 {
-        self.depth -= 1;
-
-        let mut count = 0;
-        while self.locals.len() > 0 && self.locals.last().unwrap().depth > self.depth {
-            count += 1;
-            self.locals.pop();
-        }
-        count
-    }
+impl ScopeCell {
 
     fn add_local(&mut self, name: Token) {
         let local = Local { name, depth: -1 };
@@ -143,9 +107,70 @@ impl Scope {
         }
         return Ok(None);
     }
+}
+
+struct Scope {
+    pub stack: Vec<ScopeCell>,
+}
+
+
+pub struct Compiler<'a> {
+    parser: &'a mut Parser,
+}
+
+impl Scope {
+    fn new() -> Scope {
+        Scope {
+            stack: vec! [ ScopeCell {
+                locals: vec![
+                    Local {
+                        name: Token {
+                            tpe: TokenType::Undefined,
+                            line: 0,
+                            text: String::from("")
+                        },
+                        depth: 0
+                    }
+                ],
+                depth: 0,
+                emitter: BytecodeEmitter::new(),
+            }]
+        }
+    }
+
+    fn emitter(&mut self) -> &mut BytecodeEmitter {
+        &mut self.stack[0].emitter
+    }
+
+    fn depth(&mut self) -> i32 {
+        self.stack[0].depth
+    }
+
+    fn locals(&mut self) -> &mut Vec<Local> {
+        &mut self.stack[0].locals
+    }
+
+    fn begin(&mut self) {
+        self.stack[0].depth += 1;
+    }
+
+    fn end(&mut self) -> i32 {
+        self.stack[0].depth -= 1;
+
+        let mut count = 0;
+        while self.locals().len() > 0 && self.locals().last().unwrap().depth > self.depth() {
+            count += 1;
+            self.locals().pop();
+        }
+        count
+    }
 
     fn resolve_upvalue(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
-        Err("No such upvalue")
+        if self.stack.len() == 1 {
+            return Ok(None);
+        }
+        
+        self.stack.last().unwrap().resolve_local(name)
     }
 
     // static int resolveUpvalue(Compiler* compiler, Token* name) {
@@ -328,16 +353,16 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
-            scope: vec![Scope::new()],
+            scope: Scope::new(),
         }
     }
 
-    pub fn scope(&mut self) -> &mut Scope {
-        self.scope.last_mut().unwrap()
+    pub fn scope(&mut self) -> &mut ScopeCell {
+        self.scope.stack.last_mut().unwrap()
     }
 
     pub fn emitter(&mut self) -> &mut BytecodeEmitter {
-        &mut self.scope().emitter
+        &mut self.scope().emitter()
     }
 
     pub fn advance(&mut self) {
@@ -496,13 +521,13 @@ impl Parser {
     }
 
     fn declare_variable(&mut self) {
-        if self.scope().depth == 0 {
+        if self.scope().depth() == 0 {
             return;
         }
         let name = self.previous.clone();
-        let iter = &self.scope().locals.clone();
+        let iter = &self.scope().locals().clone();
         for local in iter.iter().rev() {
-            if local.depth != -1 && local.depth < self.scope().depth {
+            if local.depth != -1 && local.depth < self.scope().depth() {
                 break;
             }
             if name.text == local.name.text {
@@ -517,7 +542,7 @@ impl Parser {
         self.consume(TokenType::Identifier, err);
 
         self.declare_variable();
-        if self.scope().depth > 0 {
+        if self.scope().depth() > 0 {
             return 0;
         }
 
@@ -525,7 +550,7 @@ impl Parser {
     }
 
     fn define_variable(&mut self, index: usize) {
-        if self.scope().depth > 0 {
+        if self.scope().depth() > 0 {
             self.scope().mark_initialized();
             return;
         }
