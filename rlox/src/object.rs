@@ -1,4 +1,5 @@
 use chunk::Chunk;
+use value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FunctionType {
@@ -14,7 +15,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn named(arity: u32, name: String) -> Function {
+    pub fn named(name: String, arity: u32) -> Function {
         Function {
             arity,
             chunk: Chunk::new(),
@@ -32,10 +33,31 @@ impl Function {
     }
 }
 
+#[derive(Clone)]
+pub struct Native {
+    pub name: String,
+    pub arity: u32,
+    pub fun: fn (&[Value]) -> Value
+}
+
+impl Native {
+    pub fn named(name: String, arity: u32, fun: fn (&[Value]) -> Value) -> Native {
+        Native { name, arity, fun }
+    }
+}
+
+impl std::fmt::Debug for Native {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "<native fn {}/{}", self.name, self.arity)
+    }
+}
+
+
 #[derive(Debug, Clone)]
 pub enum ObjType {
     String(String),
-    Function(Function)
+    Function(Function),
+    NativeFn(Native)
 }
 
 impl PartialEq for ObjType {

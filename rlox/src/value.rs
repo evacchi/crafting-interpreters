@@ -1,5 +1,6 @@
 use object::ObjType;
 use object::Function;
+use object::Native;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -16,8 +17,13 @@ impl Value {
             Value::Bool(b) => format!("{}", b),
             Value::Number(n) => format!("{}", n),
             Value::Object(ObjType::String(s)) => format!("{:?}", s),
-            Value::Object(ObjType::Function(Function{ arity,name,.. })) => 
-                format!("{:?}/{:?}", name, arity),
+            Value::Object(ObjType::Function(Function{ arity, name, .. })) => 
+                match name {
+                    Some(name) => format!("<fn {:?}/{:?}>", name, arity),
+                    None => format!("<script>"),
+                },
+            Value::Object(ObjType::NativeFn( Native { arity, name, .. } )) => 
+                format!("<native fn {:?}/{:?}>", name, arity),
         };
         print!("{}", s);
     }

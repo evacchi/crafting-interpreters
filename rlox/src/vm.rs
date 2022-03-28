@@ -5,6 +5,7 @@ use compiler::Compiler;
 use memory::Memory;
 use object::Function;
 use object::ObjType;
+use object::Native;
 use value::Value;
 
 #[derive(Clone)]
@@ -44,6 +45,13 @@ impl VM {
             memory: Memory::new(),
         }
     }
+
+    fn native_clock(_args: &[Value]) -> Value {
+        let t = std::time::SystemTime::now();
+        let elapsed = t.duration_since(std::time::UNIX_EPOCH).unwrap().as_millis() as f64;
+        Value::Number(elapsed)
+    }
+
     pub fn interpret(&mut self, source: &str) -> InterpretResult {
         let parser = &mut Parser::new(source.to_string());
         let mut compiler = Compiler::new(parser);
@@ -51,6 +59,8 @@ impl VM {
             let frame = CallFrame::new(function.clone(), 0);
             let emitter = compiler.state();
             self.memory = emitter.memory;
+            // FIXME ensure native functions are defined because memory is being overwrittend
+            self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
             self.frames.push(frame);
             self.run()
         } else {
@@ -90,9 +100,7 @@ impl VM {
 
     fn run(&mut self) -> InterpretResult {
         loop {
-            let mut no_push = false;
-            let mut new_frame = false;
-            let mut frame = self.frames.pop().unwrap();
+            let frame = self.frames.last_mut().unwrap();
             let instruction = frame.function.chunk.fetch(frame.ip);
 
             print!("          ");
@@ -104,6 +112,9 @@ impl VM {
             println!();
 
             frame.function.chunk.disassemble_instruction(frame.ip);
+
+            frame.ip += 1;
+
             match instruction {
                 OpCode::Constant { index } => {
                     let value = frame.function.chunk.read_constant(index);
@@ -116,7 +127,6 @@ impl VM {
                     self.stack.pop();
                 }
                 OpCode::GetLocal { index } => {
-                    println!("frame.slot {}, index {}", frame.slot, index);
                     self.stack.push(self.stack[frame.slot + index-1].clone());
                 }
                 OpCode::SetLocal { index } => {
@@ -174,9 +184,7 @@ impl VM {
                             (ObjType::String(a), ObjType::String(b)) => {
                                 self.stack.pop();
                                 self.stack.pop();
-
                                 let owned = format!("{}{}", a, b);
-
                                 self.stack.push(Value::Object(ObjType::String(owned)));
                             }
                             _ => self.runtime_error("Cannot concatenate")
@@ -228,46 +236,39 @@ impl VM {
                     let a = argc as usize;
                     let offset = up - a;
                     let args = &self.stack[offset..up+1];
-                    let value = args[0].clone();
-                    if let Value::Object(ObjType::Function(f)) = value {
-                        if argc == f.arity {
-                            new_frame = true;
-                            self.frames.push(frame);
-                            frame = CallFrame::new(f.clone(), up)                                
-                        } else {
-                            self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
-                        }
-                        // { fun f() {print(1);} f(); }
-                        // { fun f(a) {print(1);} f(222); }
-                    } else {
-                        println!("FOUND:: {:?}", args);
-                        self.runtime_error("Can only call functions and classes");
-                        return InterpretResult::RuntimeError;
-                }
-        
-                    // frame = &vm.frames[vm.frameCount - 1];
-                }
-                OpCode::Return => {
-                    match self.stack.pop() {
-                        Some(result) => {
-                            self.frames.pop();
-                            if self.frames.len() == 0 {
-                                self.stack.pop();
-                                // Exit interpreter.
-                                return InterpretResult::Ok;
+                    let callee = args[0].clone();
+
+                    match callee {
+                        Value::Object(ObjType::Function(f)) => 
+                            if argc == f.arity {
+                                self.frames.push(CallFrame::new(f.clone(), up));                          
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                             }
-                            no_push=true;
-                            self.stack.push(result);        
+                        Value::Object(ObjType::NativeFn(f)) =>
+                            if argc == f.arity {
+                                let result = (f.fun)(args);
+                                self.stack.push(result);                 
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
+                            }
+                        _ => {
+                            self.runtime_error("Can only call functions and classes");
+                            return InterpretResult::RuntimeError;
                         }
-                        None => {}
                     }
                 }
-            }
-            if !new_frame {
-                frame.ip += 1;
-            }
-            if !no_push {
-                self.frames.push(frame)
+                OpCode::Return => {
+                    if let Some(result) = self.stack.pop() {
+                        self.frames.pop();
+                        if self.frames.len() == 0 {
+                            self.stack.pop();
+                            // Exit interpreter.
+                            return InterpretResult::Ok;
+                        }
+                        self.stack.push(result);        
+                    }
+                }
             }
         }
     }
@@ -279,5 +280,9 @@ impl VM {
         eprint!("[line {}] in script\n", line);
 
         self.stack.clear();
+    }
+
+    fn define_native(&mut self, fun: Native) {
+        self.memory.set_global(fun.name.to_string(), Value::Object(ObjType::NativeFn(fun)));
     }
 }

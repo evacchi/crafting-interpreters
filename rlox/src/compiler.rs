@@ -74,6 +74,7 @@ struct Local {
     depth: i32,
 }
 
+#[derive(Debug, Clone)]
 struct Scope {
     locals: Vec<Local>,
     depth: i32,
@@ -527,9 +528,14 @@ impl Parser {
     }
 
     fn function(&mut self, ftype: FunctionType) {
-        let emitter = BytecodeEmitter::new();
+        let mut emitter = BytecodeEmitter::new();
+        emitter.function.tpe = ftype;
+        let scope = Scope::new();
         let old_emitter = self.emitter.clone();
+        let old_scope = self.scope.clone();
         self.emitter = emitter;
+        self.scope = scope;
+
         self.scope.begin(); 
         
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
@@ -553,6 +559,7 @@ impl Parser {
 
         let emitter = self.emitter.clone();
         self.emitter = old_emitter;
+        self.scope = old_scope;
 
         let function = emitter.function;
         let ftype = ObjType::Function(function);
@@ -682,6 +689,19 @@ impl Parser {
         self.emitter.emit_byte(OpCode::Print, self.current.line);
     }
 
+    fn return_statement(&mut self) {
+        if self.emitter.function.tpe == FunctionType::Script {
+            self.error("Can't return from top-level code.");
+        }
+        if self.matches(TokenType::Semicolon) {
+            self.emitter.emit_return(self.current.line);
+        } else {
+            self.expression();
+            self.consume(TokenType::Semicolon, "Expect ';' after return value.");
+            self.emitter.emit_byte(OpCode::Return, self.current.line);
+        }
+    }
+
     fn while_statement(&mut self) {
         let loop_start = self.emitter.chunk().code.len() - 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
@@ -749,6 +769,8 @@ impl Parser {
             self.for_statement();
         } else if self.matches(TokenType::If) {
             self.if_statement();
+        } else if self.matches(TokenType::Return) {
+            self.return_statement();
         } else if self.matches(TokenType::While) {
             self.while_statement();
         } else if self.matches(TokenType::LeftBrace) {

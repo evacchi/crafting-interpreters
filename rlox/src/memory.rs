@@ -7,7 +7,7 @@ use value::Value;
 #[derive(Clone)]
 pub struct Memory {
     objects: Vec<ObjType>,
-    globals: HashMap<String, Value>,
+    pub globals: HashMap<String, Value>,
     strings: HashSet<String>,
 }
 
