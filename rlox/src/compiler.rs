@@ -142,6 +142,10 @@ impl Scope {
         }
         return Ok(None);
     }
+
+    fn resolve_upvalue(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+        Err("No such upvalue")
+    }
 }
 
 impl <'a> Compiler<'a> {
@@ -382,34 +386,71 @@ impl Parser {
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) {
+        let cons_get: fn (usize) -> OpCode;
+        let cons_set: fn (usize) -> OpCode;
 
-        // let cons: fn (usize) -> OpCode;
-
-
-
+        let arg;
         match self.scope.resolve_local(name) {
-            Err(msg) => self.error(msg),
-            Ok(optindex) => {
-                if can_assign && self.matches(TokenType::Equal) {
-                    self.expression();
-                    let op = match optindex {
-                        Some(index) => OpCode::SetLocal { index },
-                        None => OpCode::SetGlobal {
-                            index: self.identifier_constant(name),
-                        },
-                    };
-                    self.emitter.emit_byte(op, self.current.line);
-                } else {
-                    let op = match optindex {
-                        Some(index) => OpCode::GetLocal { index },
-                        None => OpCode::GetGlobal {
-                            index: self.identifier_constant(name),
-                        },
-                    };
-                    self.emitter.emit_byte(op, self.current.line);
+            Err(msg) => {
+                self.error(msg);
+                return;
+            }
+            Ok(Some(arg_)) => {
+                arg = arg_;
+                cons_get = |index| OpCode::GetLocal { index };
+                cons_set = |index| OpCode::SetLocal { index };
+            }
+            Ok(None) => {
+                match self.scope.resolve_upvalue(name) {
+                    Err(msg) => {
+                        self.error(msg);
+                        return;
+                    }
+                    Ok(Some(arg_)) => {
+                        arg = arg_;
+                        cons_get = |index| OpCode::GetUpvalue { index };
+                        cons_set = |index| OpCode::SetUpvalue { index };
+                    }
+                    Ok(None) => {
+                        arg = self.identifier_constant(name);
+                        cons_get = |index| OpCode::GetGlobal { index };
+                        cons_set = |index| OpCode::SetGlobal { index };
+                    }
                 }
             }
         }
+
+        if can_assign && self.matches(TokenType::Equal) {
+            self.expression();
+            self.emitter.emit_byte(cons_set(arg), self.current.line)
+        } else {
+            self.emitter.emit_byte(cons_get(arg), self.current.line)
+        }
+
+
+        // match self.scope.resolve_local(name) {
+        //     Err(msg) => self.error(msg),
+        //     Ok(optindex) => {
+        //         if can_assign && self.matches(TokenType::Equal) {
+        //             self.expression();
+        //             let op = match optindex {
+        //                 Some(index) => OpCode::SetLocal { index },
+        //                 None => OpCode::SetGlobal {
+        //                     index: self.identifier_constant(name),
+        //                 },
+        //             };
+        //             self.emitter.emit_byte(op, self.current.line);
+        //         } else {
+        //             let op = match optindex {
+        //                 Some(index) => OpCode::GetLocal { index },
+        //                 None => OpCode::GetGlobal {
+        //                     index: self.identifier_constant(name),
+        //                 },
+        //             };
+        //             self.emitter.emit_byte(op, self.current.line);
+        //         }
+        //     }
+        // }
     }
 
     fn variable(&mut self, can_assign: bool) {

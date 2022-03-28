@@ -170,6 +170,8 @@ impl VM {
                         }
                     }
                 }
+                OpCode::GetUpvalue { index } => {}
+                OpCode::SetUpvalue { index } => {}
                 OpCode::Equal => {
                     let b = self.stack.pop().unwrap();
                     let a = self.stack.pop().unwrap();
