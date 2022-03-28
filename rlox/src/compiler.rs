@@ -7,6 +7,7 @@ use memory::Memory;
 use object::Function;
 use object::FunctionType;
 use object::ObjType;
+use object::Upvalue;
 
 use scanner::Scanner;
 use scanner::Token;
@@ -71,19 +72,53 @@ pub struct Parser {
 struct Local {
     name: Token,
     depth: i32,
+    is_captured: bool
 }
 
 #[derive(Clone)]
 struct ScopeCell {
     locals: Vec<Local>,
+    upvalues: Vec<Upvalue>,
     depth: i32,
     emitter: BytecodeEmitter,
 }
 
 impl ScopeCell {
 
+    fn new() -> ScopeCell {
+        ScopeCell {
+            locals: vec![
+                Local {
+                    name: Token {
+                        tpe: TokenType::Undefined,
+                        line: 0,
+                        text: String::from("")
+                    },
+                    depth: 0,
+                    is_captured: false
+                }
+            ],
+            upvalues: Vec::new(),
+            depth: 0,
+            emitter: BytecodeEmitter::new(),
+        }
+    }
+
+    fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
+        let upvalue = self.upvalues
+            .iter().enumerate()
+            .find(|(i,u)| u.index == index && u.is_local == is_local);
+            match upvalue {
+                Some((i,_)) => i,
+                None => {
+                    self.upvalues.push(Upvalue{index,is_local});
+                    self.upvalues.len() - 1
+                } 
+            }
+    }
+
     fn add_local(&mut self, name: Token) {
-        let local = Local { name, depth: -1 };
+        let local = Local { name, depth: -1, is_captured: false };
         self.locals.push(local);
     }
 
@@ -107,6 +142,29 @@ impl ScopeCell {
         }
         return Ok(None);
     }
+
+    fn depth(&mut self) -> i32 {
+        self.depth
+    }
+
+    fn locals(&mut self) -> &mut Vec<Local> {
+        &mut self.locals
+    }
+
+    fn begin(&mut self) {
+        self.depth += 1;
+    }
+
+    fn end(&mut self) -> i32 {
+        self.depth -= 1;
+
+        let mut count = 0;
+        while self.locals().len() > 0 && self.locals().last().unwrap().depth > self.depth() {
+            count += 1;
+            self.locals().pop();
+        }
+        count
+    }
 }
 
 struct Scope {
@@ -121,68 +179,40 @@ pub struct Compiler<'a> {
 impl Scope {
     fn new() -> Scope {
         Scope {
-            stack: vec! [ ScopeCell {
-                locals: vec![
-                    Local {
-                        name: Token {
-                            tpe: TokenType::Undefined,
-                            line: 0,
-                            text: String::from("")
-                        },
-                        depth: 0
-                    }
-                ],
-                depth: 0,
-                emitter: BytecodeEmitter::new(),
-            }]
+            stack: vec! [ ScopeCell::new() ]
         }
-    }
-
-    fn emitter(&mut self) -> &mut BytecodeEmitter {
-        &mut self.stack[0].emitter
-    }
-
-    fn depth(&mut self) -> i32 {
-        self.stack[0].depth
-    }
-
-    fn locals(&mut self) -> &mut Vec<Local> {
-        &mut self.stack[0].locals
-    }
-
-    fn begin(&mut self) {
-        self.stack[0].depth += 1;
-    }
-
-    fn end(&mut self) -> i32 {
-        self.stack[0].depth -= 1;
-
-        let mut count = 0;
-        while self.locals().len() > 0 && self.locals().last().unwrap().depth > self.depth() {
-            count += 1;
-            self.locals().pop();
-        }
-        count
     }
 
     fn resolve_upvalue(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+        // there is no enclosing function: assume global
         if self.stack.len() == 1 {
             return Ok(None);
         }
-        
-        self.stack.last().unwrap().resolve_local(name)
+
+        // look for  a local in the enclosing function
+        let l = self.stack.len();
+        let mut enclosing = &mut self.stack[l-2];
+        match enclosing.resolve_local(name)? {
+            Some(local) => {
+                enclosing.locals()[local].is_captured = true;
+                Ok(Some(self.stack.last_mut().unwrap().add_upvalue(local, true)))
+            }
+            None => {
+                let mut enclosing = &self.stack[l-2];
+                match self.resolve_upvalue(name)? {
+                    Some(upvalue) => 
+                        Ok(Some(self.stack.last_mut().unwrap().add_upvalue(upvalue, false))),
+                    None => Ok(None)
+                }
+            }
+        }
+        //self.stack.last_mut().unwrap().resolve_local(name)
     }
 
-    // static int resolveUpvalue(Compiler* compiler, Token* name) {
-    //     if (compiler->enclosing == NULL) return -1;
-      
-    //     int local = resolveLocal(compiler->enclosing, name);
-    //     if (local != -1) {
-    //       return addUpvalue(compiler, (uint8_t)local, true);
-    //     }
-      
-    //     return -1;
-    //   }
+    fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+        self.stack.last_mut().unwrap().resolve_local(name)
+    }
+
 }
 
 impl <'a> Compiler<'a> {
@@ -362,7 +392,7 @@ impl Parser {
     }
 
     pub fn emitter(&mut self) -> &mut BytecodeEmitter {
-        &mut self.scope().emitter()
+        &mut self.scope.stack.last_mut().unwrap().emitter
     }
 
     pub fn advance(&mut self) {
@@ -448,7 +478,7 @@ impl Parser {
                 cons_set = |index| OpCode::SetLocal { index };
             }
             Ok(None) => {
-                match self.scope().resolve_upvalue(name) {
+                match self.scope.resolve_upvalue(name) {
                     Err(msg) => {
                         self.error(msg);
                         return;
@@ -598,7 +628,7 @@ impl Parser {
     fn function(&mut self, ftype: FunctionType) {
         let mut emitter = BytecodeEmitter::new();
         emitter.function.tpe = ftype;
-        self.scope.push(Scope::new());
+        self.scope.stack.push(ScopeCell::new());
 
         self.scope().begin(); 
         
@@ -621,7 +651,7 @@ impl Parser {
 
         self.end(self.current.line);
 
-        self.scope.pop();
+        self.scope.stack.pop();
 
         let function = emitter.function;
         let ftype = ObjType::Function(function);

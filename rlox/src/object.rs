@@ -52,17 +52,25 @@ impl std::fmt::Debug for Native {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Upvalue {
+    pub index: usize,
+    pub is_local: bool
+}
 
 #[derive(Debug, Clone)]
 pub enum ObjType {
     String(String),
     Function(Function),
-    NativeFn(Native)
+    NativeFn(Native),
+    Upvalue(Upvalue)
 }
 
 impl PartialEq for ObjType {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
+            (ObjType::Upvalue(a), ObjType::Upvalue(b)) => 
+                a == b,
             (ObjType::String(a), ObjType::String(b)) => 
                 a == b,
             (ObjType::Function(Function{ arity: arity1, name: name1 , tpe: tpe1, ..}), 

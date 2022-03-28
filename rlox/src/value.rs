@@ -17,6 +17,7 @@ impl Value {
             Value::Bool(b) => format!("{}", b),
             Value::Number(n) => format!("{}", n),
             Value::Object(ObjType::String(s)) => format!("{:?}", s),
+            Value::Object(ObjType::Upvalue(s)) => format!("{:?}", s),
             Value::Object(ObjType::Function(Function{ arity, name, .. })) => 
                 match name {
                     Some(name) => format!("<fn {:?}/{:?}>", name, arity),
