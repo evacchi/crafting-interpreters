@@ -107,7 +107,7 @@ impl ScopeCell {
     fn add_upvalue(&mut self, index: usize, is_local: bool) -> usize {
         let upvalue = self.upvalues
             .iter().enumerate()
-            .find(|(i,u)| u.index == index && u.is_local == is_local);
+            .find(|(_i,u)| u.index == index && u.is_local == is_local);
             match upvalue {
                 Some((i,_)) => i,
                 None => {
@@ -191,14 +191,13 @@ impl Scope {
 
         // look for  a local in the enclosing function
         let l = self.stack.len();
-        let mut enclosing = &mut self.stack[l-2];
+        let enclosing = &mut self.stack[l-2];
         match enclosing.resolve_local(name)? {
             Some(local) => {
                 enclosing.locals()[local].is_captured = true;
                 Ok(Some(self.stack.last_mut().unwrap().add_upvalue(local, true)))
             }
             None => {
-                let mut enclosing = &self.stack[l-2];
                 match self.resolve_upvalue(name)? {
                     Some(upvalue) => 
                         Ok(Some(self.stack.last_mut().unwrap().add_upvalue(upvalue, false))),
@@ -626,9 +625,9 @@ impl Parser {
     }
 
     fn function(&mut self, ftype: FunctionType) {
-        let mut emitter = BytecodeEmitter::new();
-        emitter.function.tpe = ftype;
-        self.scope.stack.push(ScopeCell::new());
+        let mut scope = ScopeCell::new();
+        scope.emitter.function.tpe = ftype;
+        self.scope.stack.push(scope);
 
         self.scope().begin(); 
         
@@ -653,7 +652,7 @@ impl Parser {
 
         self.scope.stack.pop();
 
-        let function = emitter.function;
+        let function = self.scope().emitter.function.clone();
         let ftype = ObjType::Function(function);
         let value = Value::Object(ftype);
         let line = self.current.line;
