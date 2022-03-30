@@ -656,7 +656,8 @@ impl Parser {
         let ftype = ObjType::Function(function);
         let value = Value::Object(ftype);
         let line = self.current.line;
-        self.emitter().emit_constant(value, line);
+        let index = self.emitter().write_constant(value);
+        self.emitter().emit_byte(OpCode::Closure{ index }, line);
 
     }
 

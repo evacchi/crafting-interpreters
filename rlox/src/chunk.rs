@@ -24,6 +24,7 @@ pub enum OpCode {
     Loop { jump: usize },
     Call { argc: u32 },
     Closure { index: usize },
+    CloseUpvalue,
     Return,
     Add,
     Subtract,
@@ -117,6 +118,7 @@ impl Chunk {
             OpCode::Loop { jump } => self.jump_instruction("OP_LOOP", -1, offset + 1, jump),
             OpCode::Call { .. } => self.simple_instruction("OP_CALL"),
             OpCode::Closure { index } => self.constant_instruction("OP_CLOSURE", index),
+            OpCode::CloseUpvalue => self.simple_instruction("OP_CLOSE_UPVALUE"),
             OpCode::Return => self.simple_instruction("RETURN"),
         }
     }

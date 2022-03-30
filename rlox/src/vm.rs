@@ -268,6 +268,7 @@ impl VM {
                         panic!("I was expecting a function.");
                     }
                 }
+                OpCode::CloseUpvalue => {}
                 OpCode::Return => {
                     if let Some(result) = self.stack.pop() {
                         self.frames.pop();
