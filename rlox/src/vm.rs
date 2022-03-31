@@ -260,7 +260,7 @@ impl VM {
                         }
                     }
                 }
-                OpCode::Closure {index} => {
+                OpCode::Closure { index, upvalues } => {
                     let f = frame.function.chunk.read_constant(index);
                     if let Value::Object(ObjType::Function(..)) = f {
                         self.stack.push(f);

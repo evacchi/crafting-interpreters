@@ -78,9 +78,9 @@ struct Local {
 #[derive(Clone)]
 struct ScopeCell {
     locals: Vec<Local>,
-    upvalues: Vec<Upvalue>,
+    pub upvalues: Vec<Upvalue>,
     depth: i32,
-    emitter: BytecodeEmitter,
+    pub emitter: BytecodeEmitter,
 }
 
 impl ScopeCell {
@@ -194,23 +194,35 @@ impl Scope {
             return Ok(None);
         }
 
-        // look for  a local in the enclosing function
-        let l = self.stack.len();
-        let enclosing = &mut self.stack[l-2];
-        match enclosing.resolve_local(name)? {
-            Some(local) => {
+        let s = &mut self.stack;
+        for enclosing in s.into_iter().rev().skip(1) {
+            if let Some(local) = enclosing.resolve_local(name)? {
+                println!("FOUND LOCAL {:?} in {:?}", name, enclosing.emitter.function.name);
                 enclosing.locals()[local].is_captured = true;
-                Ok(Some(self.stack.last_mut().unwrap().add_upvalue(local, true)))
-            }
-            None => {
-                match self.resolve_upvalue(name)? {
-                    Some(upvalue) => 
-                        Ok(Some(self.stack.last_mut().unwrap().add_upvalue(upvalue, false))),
-                    None => Ok(None)
-                }
+                return Ok(Some(enclosing.add_upvalue(local, true)))
             }
         }
-        //self.stack.last_mut().unwrap().resolve_local(name)
+
+        Ok(None)
+        
+
+        // // look for  a local in the enclosing function
+        // let l = self.stack.len();
+        // let enclosing = &mut self.stack[l-2];
+        // match enclosing.resolve_local(name)? {
+        //     Some(local) => {
+        //         enclosing.locals()[local].is_captured = true;
+        //         Ok(Some(self.stack.last_mut().unwrap().add_upvalue(local, true)))
+        //     }
+        //     None => {
+        //         match self.resolve_upvalue(name)? {
+        //             Some(upvalue) => 
+        //                 Ok(Some(self.stack.last_mut().unwrap().add_upvalue(upvalue, false))),
+        //             None => Ok(None)
+        //         }
+        //     }
+        // }
+        // //self.stack.last_mut().unwrap().resolve_local(name)
     }
 
     fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
@@ -293,7 +305,7 @@ impl BytecodeEmitter {
 
     pub fn patch_jump(&mut self, offset: usize) {
         let new_jump = self.chunk().code.len() - 1 - offset;
-        let new_op = match self.chunk().code[offset] {
+        let new_op = match self.chunk().code[offset].clone() {
             OpCode::JumpIfFalse { jump: _ } => OpCode::JumpIfFalse { jump: new_jump },
             OpCode::Jump { jump: _ } => OpCode::Jump { jump: new_jump },
             op => panic!("Expected a Jump instruction! Found {:?}", op),
@@ -655,14 +667,15 @@ impl Parser {
 
         self.end(self.current.line);
 
-        self.scope.stack.pop();
+        let scope = self.scope.stack.pop().unwrap();
 
-        let function = self.scope().emitter.function.clone();
+        let function = scope.emitter.function;
         let ftype = ObjType::Function(function);
         let value = Value::Object(ftype);
         let line = self.current.line;
         let index = self.emitter().write_constant(value);
-        self.emitter().emit_byte(OpCode::Closure{ index }, line);
+
+        self.emitter().emit_byte(OpCode::Closure{ index, upvalues: scope.upvalues }, line);
 
     }
 

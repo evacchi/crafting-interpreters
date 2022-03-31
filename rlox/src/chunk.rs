@@ -1,6 +1,7 @@
 use value::Value;
+use object::Upvalue;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum OpCode {
     Constant { index: usize },
     Nil,
@@ -23,7 +24,7 @@ pub enum OpCode {
     JumpIfFalse { jump: usize },
     Loop { jump: usize },
     Call { argc: u32 },
-    Closure { index: usize },
+    Closure { index: usize, upvalues: Vec<Upvalue> },
     CloseUpvalue,
     Return,
     Add,
@@ -65,7 +66,7 @@ impl Chunk {
     }
 
     pub fn fetch(&self, ip: usize) -> OpCode {
-        self.code[ip]
+        self.code[ip].clone()
     }
 
     pub fn line_at(&self, ip: usize) -> usize {
@@ -117,7 +118,7 @@ impl Chunk {
             OpCode::Jump { jump } => self.jump_instruction("OP_JUMP", 1, offset + 1, jump),
             OpCode::Loop { jump } => self.jump_instruction("OP_LOOP", -1, offset + 1, jump),
             OpCode::Call { .. } => self.simple_instruction("OP_CALL"),
-            OpCode::Closure { index } => self.constant_instruction("OP_CLOSURE", index),
+            OpCode::Closure { index, .. } => self.constant_instruction("OP_CLOSURE", index),
             OpCode::CloseUpvalue => self.simple_instruction("OP_CLOSE_UPVALUE"),
             OpCode::Return => self.simple_instruction("RETURN"),
         }

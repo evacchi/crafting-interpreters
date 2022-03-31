@@ -52,7 +52,7 @@ impl std::fmt::Debug for Native {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Upvalue {
     pub index: usize,
     pub is_local: bool
