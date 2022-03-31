@@ -6,6 +6,13 @@ pub enum FunctionType {
     Script, Function
 }
 
+
+#[derive(Debug, Clone)]
+pub struct Closure {
+    pub function: Function,
+    pub upvalues: Vec<Upvalue>,
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub arity: u32,
@@ -62,6 +69,7 @@ pub struct Upvalue {
 pub enum ObjType {
     String(String),
     Function(Function),
+    Closure(Closure),
     NativeFn(Native),
     Upvalue(Upvalue)
 }
@@ -76,6 +84,9 @@ impl PartialEq for ObjType {
             (ObjType::Function(Function{ arity: arity1, name: name1 , tpe: tpe1, ..}), 
              ObjType::Function(Function{ arity: arity2, name: name2 , tpe: tpe2, ..})) =>
                 arity1 == arity2 && name1 == name2 && tpe1 == tpe2,
+            (ObjType::Closure(Closure{ function: f1, upvalues: upvs1}), 
+             ObjType::Closure(Closure{ function: f2, upvalues: upvs2})) =>
+                f1.arity == f2.arity && f1.name == f2.name && f1.tpe == f2.tpe && upvs1 == upvs2,
             _ => false
         }
     }

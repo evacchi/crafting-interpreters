@@ -1,6 +1,7 @@
 use object::ObjType;
 use object::Function;
 use object::Native;
+use object::Closure;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
@@ -23,6 +24,12 @@ impl Value {
                     Some(name) => format!("<fn {:?}/{:?}>", name, arity),
                     None => format!("<script>"),
                 },
+            Value::Object(ObjType::Closure(Closure{ function, .. })) => 
+                match function.name.clone() {
+                    Some(name) => format!("<closure fn {:?}/{:?}>", name, function.arity),
+                    None => format!("<script>"),
+                },
+
             Value::Object(ObjType::NativeFn( Native { arity, name, .. } )) => 
                 format!("<native fn {:?}/{:?}>", name, arity),
         };

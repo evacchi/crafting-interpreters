@@ -6,6 +6,7 @@ use memory::Memory;
 use object::Function;
 use object::ObjType;
 use object::Native;
+use object::Closure;
 use value::Value;
 
 #[derive(Clone)]
@@ -254,16 +255,25 @@ impl VM {
                             } else {
                                 self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                             }
-                        _ => {
+                        Value::Object(ObjType::Closure(f)) => 
+                            if argc == f.function.arity {
+                                self.frames.push(CallFrame::new(f.function.clone(), up));                          
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", f.function.arity, argc));
+                            }
+                        w => {
+                            println!("GOT {:?}", w);
+
                             self.runtime_error("Can only call functions and classes");
                             return InterpretResult::RuntimeError;
                         }
                     }
                 }
                 OpCode::Closure { index, upvalues } => {
-                    let f = frame.function.chunk.read_constant(index);
-                    if let Value::Object(ObjType::Function(..)) = f {
-                        self.stack.push(f);
+                    let fc = frame.function.chunk.read_constant(index);
+                    if let Value::Object(ObjType::Function(function)) = fc {
+                        let closure = Closure{function, upvalues};
+                        self.stack.push(Value::Object(ObjType::Closure(closure)));
                     } else {
                         panic!("I was expecting a function.");
                     }
