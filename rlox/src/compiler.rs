@@ -155,13 +155,18 @@ impl ScopeCell {
         self.depth += 1;
     }
 
-    fn end(&mut self) -> i32 {
+    fn end(&mut self, line: usize) -> i32 {
         self.depth -= 1;
 
-        let mut count = 0;
+        let mut count: i32 = 0;
         while self.locals().len() > 0 && self.locals().last().unwrap().depth > self.depth() {
-            count += 1;
+            if self.locals()[count as usize].is_captured {
+                self.emitter.emit_byte(OpCode::CloseUpvalue, line);
+            } else {
+                self.emitter.emit_byte(OpCode::Pop, line);
+            }
             self.locals().pop();
+            count += 1;
         }
         count
     }
@@ -754,10 +759,8 @@ impl Parser {
             self.emitter().emit_byte(OpCode::Pop, l); // Condition.
         }
 
-        for _ in 0..self.scope().end() {
-            let l = self.current.line;
-            self.emitter().emit_byte(OpCode::Pop, l);
-        }
+        let l = self.current.line;
+        self.scope().end(l); 
     }
 
     fn if_statement(&mut self) {
@@ -888,9 +891,7 @@ impl Parser {
             self.scope().begin();
             self.block();
             let l = self.current.line;
-            for _ in 0..self.scope().end() {
-                self.emitter().emit_byte(OpCode::Pop, l);
-            }
+            self.scope().end(l);
         } else {
             self.expression_statement();
         }
