@@ -57,12 +57,14 @@ impl VM {
         let parser = &mut Parser::new(source.to_string());
         let mut compiler = Compiler::new(parser);
         if let Some(function) = compiler.compile() {
+            self.stack.push(Value::Object(ObjType::Function(function.clone())));
             let frame = CallFrame::new(function.clone(), 0);
             let emitter = compiler.state();
             self.memory = emitter.memory;
             // FIXME ensure native functions are defined because memory is being overwrittend
             self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
             self.frames.push(frame);
+            
             self.run()
         } else {
             return InterpretResult::CompileError;

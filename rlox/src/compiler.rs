@@ -643,6 +643,9 @@ impl Parser {
 
     fn function(&mut self, ftype: FunctionType) {
         let mut scope = ScopeCell::new();
+        if ftype != FunctionType::Script {
+            scope.emitter.function.name = Some(self.previous.text.clone());
+        }
         scope.emitter.function.tpe = ftype;
         self.scope.stack.push(scope);
 
@@ -914,7 +917,8 @@ impl Parser {
         self.emitter().emit_return(line);
         // debug statements
         if !self.had_error {
-            self.emitter().chunk().disassemble("code");
+            let s = self.emitter().function.name.clone().or(Some("<script>".to_string()));
+            self.emitter().chunk().disassemble(&s.unwrap());
         }
     }
 
