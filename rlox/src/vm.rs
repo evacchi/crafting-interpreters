@@ -288,6 +288,7 @@ impl VM {
                     }
                 }
                 OpCode::Closure { index, upvalues } => {
+                    println!("CLOSURE {:?}", upvalues);
                     let fc = frame.closure.function.chunk.read_constant(index);
                     if let Value::Object(ObjType::Function(function)) = fc {
                         let us: Vec<Upvalue> = upvalues.iter()

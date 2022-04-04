@@ -455,7 +455,7 @@ impl Parser {
 
     fn string(&mut self, _can_assign: bool) {
         let l = self.previous.line;
-        let value = Value::Object(ObjType::String(self.previous.text.clone()));
+        let value = Value::Object(ObjType::String(self.previous.text[1..self.previous.text.len()-1].to_string()));
         self.emitter().emit_constant(value, l);
     }
 
