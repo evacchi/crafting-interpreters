@@ -13,6 +13,15 @@ pub struct Closure {
     pub upvalues: Vec<Upvalue>,
 }
 
+impl Closure {
+    pub fn new(function: Function) -> Closure {
+        Closure {
+            function,
+            upvalues: Vec::new()
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     pub arity: u32,

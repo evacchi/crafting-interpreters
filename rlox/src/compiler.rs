@@ -204,25 +204,6 @@ impl Scope {
         }
 
         Ok(None)
-        
-
-        // // look for  a local in the enclosing function
-        // let l = self.stack.len();
-        // let enclosing = &mut self.stack[l-2];
-        // match enclosing.resolve_local(name)? {
-        //     Some(local) => {
-        //         enclosing.locals()[local].is_captured = true;
-        //         Ok(Some(self.stack.last_mut().unwrap().add_upvalue(local, true)))
-        //     }
-        //     None => {
-        //         match self.resolve_upvalue(name)? {
-        //             Some(upvalue) => 
-        //                 Ok(Some(self.stack.last_mut().unwrap().add_upvalue(upvalue, false))),
-        //             None => Ok(None)
-        //         }
-        //     }
-        // }
-        // //self.stack.last_mut().unwrap().resolve_local(name)
     }
 
     fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
@@ -500,6 +481,7 @@ impl Parser {
                         return;
                     }
                     Ok(Some(arg_)) => {
+                        println!("SOME ARG GET/SET UP {}", arg_);
                         arg = arg_;
                         cons_get = |index| OpCode::GetUpvalue { index };
                         cons_set = |index| OpCode::SetUpvalue { index };
@@ -650,9 +632,7 @@ impl Parser {
         self.scope.stack.push(scope);
 
         self.scope().begin(); 
-        
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
-
 
         if !self.check(TokenType::RightParen) {
             loop {
