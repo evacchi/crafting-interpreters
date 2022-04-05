@@ -194,16 +194,54 @@ impl Scope {
             return Ok(None);
         }
 
+        let mut enclosing_stack = Vec::new();
         let s = &mut self.stack;
+
+        let mut loc = None;
         for enclosing in s.into_iter().rev().skip(1) {
             if let Some(local) = enclosing.resolve_local(name)? {
                 println!("FOUND LOCAL {:?} in {:?}", name, enclosing.emitter.function.name);
                 enclosing.locals()[local].is_captured = true;
-                return Ok(Some(enclosing.add_upvalue(local, true)))
+                loc = Some(enclosing.add_upvalue(local, true));
+                break;
+            } else {
+
+                println!("PUSH ENCLOSING {:?}", enclosing.emitter.function.name);
+
+                enclosing_stack.push(enclosing);
             }
+            // else propagate upvalue
         }
 
-        Ok(None)
+        if let Some(mut l) = loc {
+            while let Some(enclosing) = enclosing_stack.pop() {
+                println!("ADD UPVALUE {:?}", enclosing.emitter.function.name);
+                l = enclosing.add_upvalue(l, false);
+            }
+            loc = Some(l);
+        } 
+    
+
+        Ok(loc)
+
+
+
+        // for enclosing in s.into_iter().rev().skip(1) {
+        //     if let Some(local) = enclosing.resolve_local(name)? {
+        //         println!("FOUND LOCAL {:?} in {:?}", name, enclosing.emitter.function.name);
+        //         enclosing.locals()[local].is_captured = true;
+        //         loc = Some(enclosing.add_upvalue(local, true));
+        //         break;
+        //     }
+        //     // else propagate upvalue
+        // }
+        // if let Some(idx) = loc {
+        //     for i in 0..idx {
+        //         s[i].add_upvalue(idx, false);
+        //     }
+        // } 
+
+        // Ok(None)
     }
 
     fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
