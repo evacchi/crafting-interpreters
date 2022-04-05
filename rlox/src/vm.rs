@@ -179,6 +179,9 @@ impl VM {
                 }
                 OpCode::GetUpvalue { index } => {
                     println!("GET UP {:?}", frame.closure.upvalues);
+                    if frame.closure.upvalues.len() <= index {
+                        panic!("BAD INDEX {} < {}", frame.closure.upvalues.len(), index);
+                    }
                     let idx = frame.slot + frame.closure.upvalues[index].index;
                     self.stack.push(self.stack[idx].clone());
                 }

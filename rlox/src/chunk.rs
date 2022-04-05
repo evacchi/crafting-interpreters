@@ -37,7 +37,7 @@ pub enum OpCode {
 #[derive(Clone,Debug)]
 pub struct Chunk {
     pub code: Vec<OpCode>,
-    values: Vec<Value>,
+    pub values: Vec<Value>,
     lines: Vec<usize>,
 }
 
@@ -113,13 +113,19 @@ impl Chunk {
             OpCode::Negate => self.simple_instruction("NEGATE"),
             OpCode::Print => self.simple_instruction("PRINT"),
             OpCode::JumpIfFalse { jump } => {
-                self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset + 1, jump)
+                self.jump_instruction("JUMP_IF_FALSE", 1, offset + 1, jump)
             }
-            OpCode::Jump { jump } => self.jump_instruction("OP_JUMP", 1, offset + 1, jump),
-            OpCode::Loop { jump } => self.jump_instruction("OP_LOOP", -1, offset + 1, jump),
-            OpCode::Call { .. } => self.simple_instruction("OP_CALL"),
-            OpCode::Closure { index, .. } => self.constant_instruction("OP_CLOSURE", index),
-            OpCode::CloseUpvalue => self.simple_instruction("OP_CLOSE_UPVALUE"),
+            OpCode::Jump { jump } => self.jump_instruction("JUMP", 1, offset + 1, jump),
+            OpCode::Loop { jump } => self.jump_instruction("LOOP", -1, offset + 1, jump),
+            OpCode::Call { .. } => self.simple_instruction("CALL"),
+            OpCode::Closure { index, upvalues } => {
+                self.constant_instruction("CLOSURE", index);
+                for Upvalue{is_local, index} in upvalues {
+                    println!("{:04}      |                     {} {}",
+                        offset, if *is_local {"local"} else {"upvalue"}, index);
+                }
+            }
+            OpCode::CloseUpvalue => self.simple_instruction("CLOSE_UPVALUE"),
             OpCode::Return => self.simple_instruction("RETURN"),
         }
     }

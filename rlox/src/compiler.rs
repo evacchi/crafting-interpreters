@@ -130,7 +130,7 @@ impl ScopeCell {
         self.locals[lastidx].depth = self.depth;
     }
 
-    fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+    fn resolve_local(&self, name: &Token) -> Result<Option<usize>, &'static str> {
         for (i, local) in self.locals.iter().enumerate().rev() {
             if name.text == local.name.text {
                 if local.depth == -1 {
@@ -198,25 +198,46 @@ impl Scope {
         let s = &mut self.stack;
 
         let mut loc = None;
-        for enclosing in s.into_iter().rev().skip(1) {
-            if let Some(local) = enclosing.resolve_local(name)? {
-                println!("FOUND LOCAL {:?} in {:?}", name, enclosing.emitter.function.name);
-                enclosing.locals()[local].is_captured = true;
-                loc = Some(enclosing.add_upvalue(local, true));
+
+        println!("RESOLVE_UPVALUE {}", s.len()-2);
+        for i in (0..s.len()-1).rev() {
+            println!("ITER {:?} ", s[i].emitter.function.name);
+
+            if let Some(local) = s[i].resolve_local(name)? {
+                println!("ADD LOCAL {:?} in {:?}", 
+                    local, s[i].emitter.function.name);
+                s[i].locals()[local].is_captured = true;
+                loc = Some(s[i+1].add_upvalue(local, true));
                 break;
             } else {
+                println!("PUSH ENCLOSING {:?}", s[i].emitter.function.name);
 
-                println!("PUSH ENCLOSING {:?}", enclosing.emitter.function.name);
-
-                enclosing_stack.push(enclosing);
+                enclosing_stack.push(i);
             }
-            // else propagate upvalue
         }
+
+
+        println!("STACK {:?}", enclosing_stack);
+
+        // for enclosing in s.into_iter().rev().skip(1) {
+        //     if let Some(local) = enclosing.resolve_local(name)? {
+        //         println!("ADD LOCAL {:?} in {:?}", local, enclosing.emitter.function.name);
+        //         enclosing.locals()[local].is_captured = true;
+        //         loc = Some(enclosing.add_upvalue(local, true));
+        //         break;
+        //     } else {
+
+        //         println!("PUSH ENCLOSING {:?}", enclosing.emitter.function.name);
+
+        //         enclosing_stack.push(enclosing);
+        //     }
+        //     // else propagate upvalue
+        // }
 
         if let Some(mut l) = loc {
             while let Some(enclosing) = enclosing_stack.pop() {
-                println!("ADD UPVALUE {:?}", enclosing.emitter.function.name);
-                l = enclosing.add_upvalue(l, false);
+                println!("ADD UPVALUE {:?} {}", s[enclosing+1].emitter.function.name, l);
+                l = s[enclosing+1].add_upvalue(l, false);
             }
             loc = Some(l);
         } 
