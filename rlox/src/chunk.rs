@@ -1,6 +1,8 @@
+use compiler::Upvalue;
+use compiler::Upvalue::{Local, Nonlocal};
 use value::Value;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum OpCode {
     Constant { index: usize },
     Nil,
@@ -12,6 +14,8 @@ pub enum OpCode {
     GetGlobal { index: usize },
     DefineGlobal { index: usize },
     SetGlobal { index: usize },
+    GetUpvalue { index: usize },
+    SetUpvalue { index: usize },
     Equal,
     Greater,
     Less,
@@ -21,6 +25,8 @@ pub enum OpCode {
     JumpIfFalse { jump: usize },
     Loop { jump: usize },
     Call { argc: u32 },
+    Closure { index: usize, upvalues: Vec<Upvalue> },
+    CloseUpvalue,
     Return,
     Add,
     Subtract,
@@ -32,7 +38,7 @@ pub enum OpCode {
 #[derive(Clone,Debug)]
 pub struct Chunk {
     pub code: Vec<OpCode>,
-    values: Vec<Value>,
+    pub values: Vec<Value>,
     lines: Vec<usize>,
 }
 
@@ -61,7 +67,7 @@ impl Chunk {
     }
 
     pub fn fetch(&self, ip: usize) -> OpCode {
-        self.code[ip]
+        self.code[ip].clone()
     }
 
     pub fn line_at(&self, ip: usize) -> usize {
@@ -95,6 +101,8 @@ impl Chunk {
             OpCode::GetGlobal { index } => self.constant_instruction("GET_GLOBAL", index),
             OpCode::DefineGlobal { index } => self.constant_instruction("DEFINE_GLOBAL", index),
             OpCode::SetGlobal { index } => self.constant_instruction("SET_GLOBAL", index),
+            OpCode::GetUpvalue { index } => self.byte_instruction("GET_UPVALUE", index),
+            OpCode::SetUpvalue { index } => self.byte_instruction("SET_UPVALUE", index),
             OpCode::Equal => self.simple_instruction("EQUAL"),
             OpCode::Greater => self.simple_instruction("GREATER"),
             OpCode::Less => self.simple_instruction("LESS"),
@@ -106,11 +114,18 @@ impl Chunk {
             OpCode::Negate => self.simple_instruction("NEGATE"),
             OpCode::Print => self.simple_instruction("PRINT"),
             OpCode::JumpIfFalse { jump } => {
-                self.jump_instruction("OP_JUMP_IF_FALSE", 1, offset + 1, jump)
+                self.jump_instruction("JUMP_IF_FALSE", 1, offset + 1, jump)
             }
-            OpCode::Jump { jump } => self.jump_instruction("OP_JUMP", 1, offset + 1, jump),
-            OpCode::Loop { jump } => self.jump_instruction("OP_LOOP", -1, offset + 1, jump),
-            OpCode::Call { .. } => self.simple_instruction("OP_CALL"),
+            OpCode::Jump { jump } => self.jump_instruction("JUMP", 1, offset + 1, jump),
+            OpCode::Loop { jump } => self.jump_instruction("LOOP", -1, offset + 1, jump),
+            OpCode::Call { .. } => self.simple_instruction("CALL"),
+            OpCode::Closure { index, upvalues } => {
+                self.constant_instruction("CLOSURE", index);
+                for up in upvalues {
+                    println!("{:04}      |                     {:?}", offset, up);
+                }
+            }
+            OpCode::CloseUpvalue => self.simple_instruction("CLOSE_UPVALUE"),
             OpCode::Return => self.simple_instruction("RETURN"),
         }
     }

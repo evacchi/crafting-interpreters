@@ -64,7 +64,6 @@ pub struct Parser {
     previous: Token,
     had_error: bool,
     panic_mode: bool,
-    emitter: BytecodeEmitter,
     scope: Scope,
 }
 
@@ -72,53 +71,60 @@ pub struct Parser {
 struct Local {
     name: Token,
     depth: i32,
+    is_captured: bool
 }
 
-#[derive(Debug, Clone)]
-struct Scope {
+#[derive(Clone,PartialEq,Debug)]
+pub enum Upvalue {
+    Local(usize),
+    Nonlocal(usize)
+}
+
+#[derive(Clone)]
+struct ScopeCell {
     locals: Vec<Local>,
+    pub upvalues: Vec<Upvalue>,
     depth: i32,
+    pub emitter: BytecodeEmitter,
 }
 
-pub struct Compiler<'a> {
-    parser: &'a mut Parser,
-}
+impl ScopeCell {
 
-impl Scope {
-    fn new() -> Scope {
-        let mut s = Scope {
-            locals: Vec::new(),
+    fn new() -> ScopeCell {
+        ScopeCell {
+            locals: vec![
+                Local {
+                    name: Token {
+                        tpe: TokenType::Undefined,
+                        line: 0,
+                        text: String::from("")
+                    },
+                    depth: 0,
+                    is_captured: false
+                }
+            ],
+            upvalues: Vec::new(),
             depth: 0,
-        };
-        let l = Local {
-            name: Token {
-                tpe: TokenType::Undefined,
-                line: 0,
-                text: String::from("")
-            },
-            depth: 0
-        };
-        s.locals.push(l);
-        s
-    }
-
-    fn begin(&mut self) {
-        self.depth += 1;
-    }
-
-    fn end(&mut self) -> i32 {
-        self.depth -= 1;
-
-        let mut count = 0;
-        while self.locals.len() > 0 && self.locals.last().unwrap().depth > self.depth {
-            count += 1;
-            self.locals.pop();
+            emitter: BytecodeEmitter::new(),
         }
-        count
+    }
+
+    fn add_upvalue(&mut self, up: Upvalue) -> usize {
+        let upvalue = self.upvalues
+            .iter().enumerate()
+            .find(|(_i,u)| **u == up);
+            match upvalue {
+                Some((i,_)) => i,
+                None => {
+                    println!("!!PUSH!!");
+                    self.upvalues.push(up);
+                    self.upvalues.len() - 1
+                } 
+            }
     }
 
     fn add_local(&mut self, name: Token) {
-        let local = Local { name, depth: -1 };
+        let local = Local { name, depth: -1, is_captured: false };
         self.locals.push(local);
     }
 
@@ -130,7 +136,7 @@ impl Scope {
         self.locals[lastidx].depth = self.depth;
     }
 
-    fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+    fn resolve_local(&self, name: &Token) -> Result<Option<usize>, &'static str> {
         for (i, local) in self.locals.iter().enumerate().rev() {
             if name.text == local.name.text {
                 if local.depth == -1 {
@@ -142,6 +148,100 @@ impl Scope {
         }
         return Ok(None);
     }
+
+    fn depth(&mut self) -> i32 {
+        self.depth
+    }
+
+    fn locals(&mut self) -> &mut Vec<Local> {
+        &mut self.locals
+    }
+
+    fn begin(&mut self) {
+        self.depth += 1;
+    }
+
+    fn end(&mut self, line: usize) -> i32 {
+        self.depth -= 1;
+
+        let mut count: i32 = 0;
+        while self.locals().len() > 0 && self.locals().last().unwrap().depth > self.depth() {
+            if self.locals().last().unwrap().is_captured {
+                self.emitter.emit_byte(OpCode::CloseUpvalue, line);
+            } else {
+                self.emitter.emit_byte(OpCode::Pop, line);
+            }
+            self.locals().pop();
+            count += 1;
+        }
+        count
+    }
+}
+
+struct Scope {
+    pub stack: Vec<ScopeCell>,
+}
+
+
+pub struct Compiler<'a> {
+    parser: &'a mut Parser,
+}
+
+impl Scope {
+    fn new() -> Scope {
+        Scope {
+            stack: vec! [ ScopeCell::new() ]
+        }
+    }
+
+    fn resolve_upvalue(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+        // there is no enclosing function: assume global
+        if self.stack.len() == 1 {
+            return Ok(None);
+        }
+
+        let mut enclosing_stack = Vec::new();
+        let s = &mut self.stack;
+
+        let mut loc = None;
+
+        println!("RESOLVE_UPVALUE {}", s.len()-2);
+        for enclosing in (0..s.len()-1).rev() {
+            let current = enclosing+1;
+            println!("ITER {:?} ", s[enclosing].emitter.function.name);
+
+            if let Some(local) = s[enclosing].resolve_local(name)? {
+                println!("ADD LOCAL {:?} in {:?}", 
+                    local, s[enclosing].emitter.function.name);
+                s[enclosing].locals()[local].is_captured = true;
+                loc = Some(s[current].add_upvalue(Upvalue::Local(local)));
+                break;
+            } else {
+                println!("PUSH ENCLOSING {:?}", s[current].emitter.function.name);
+
+                enclosing_stack.push(current);
+            }
+        }
+
+        println!("STACK {:?}", enclosing_stack);
+
+        if let Some(mut l) = loc {
+            while let Some(enclosing) = enclosing_stack.pop() {
+                println!("ADD UPVALUE {:?} {}", s[enclosing].emitter.function.name, l);
+                l = s[enclosing].add_upvalue(Upvalue::Nonlocal(l));
+            }
+            loc = Some(l);
+        } 
+    
+
+        Ok(loc)
+
+    }
+
+    fn resolve_local(&mut self, name: &Token) -> Result<Option<usize>, &'static str> {
+        self.stack.last_mut().unwrap().resolve_local(name)
+    }
+
 }
 
 impl <'a> Compiler<'a> {
@@ -161,12 +261,12 @@ impl <'a> Compiler<'a> {
             None
         } else {
             self.parser.end(self.parser.previous.line);
-            let f = self.parser.emitter.function.clone();
+            let f = self.parser.emitter().function.clone();
             Some(f)
         }
     }
     pub fn state(self) -> BytecodeEmitter {
-        self.parser.emitter.clone()
+        self.parser.emitter().clone()
     }
 }
 
@@ -218,7 +318,7 @@ impl BytecodeEmitter {
 
     pub fn patch_jump(&mut self, offset: usize) {
         let new_jump = self.chunk().code.len() - 1 - offset;
-        let new_op = match self.chunk().code[offset] {
+        let new_op = match self.chunk().code[offset].clone() {
             OpCode::JumpIfFalse { jump: _ } => OpCode::JumpIfFalse { jump: new_jump },
             OpCode::Jump { jump: _ } => OpCode::Jump { jump: new_jump },
             op => panic!("Expected a Jump instruction! Found {:?}", op),
@@ -312,9 +412,16 @@ impl Parser {
             },
             had_error: false,
             panic_mode: false,
-            emitter: BytecodeEmitter::new(),
             scope: Scope::new(),
         }
+    }
+
+    pub fn scope(&mut self) -> &mut ScopeCell {
+        self.scope.stack.last_mut().unwrap()
+    }
+
+    pub fn emitter(&mut self) -> &mut BytecodeEmitter {
+        &mut self.scope.stack.last_mut().unwrap().emitter
     }
 
     pub fn advance(&mut self) {
@@ -359,57 +466,75 @@ impl Parser {
 
     pub fn number(&mut self, _can_assign: bool) {
         let n = self.previous.text.parse::<f64>().unwrap();
-        self.emitter
-            .emit_constant(Value::Number(n), self.previous.line);
+        let l = self.previous.line;
+        self.emitter()
+            .emit_constant(Value::Number(n), l);
     }
 
     fn or_(&mut self, _can_assign: bool) {
-        self.emitter
-            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let else_jump = self.emitter.chunk().code.len() - 1;
-        self.emitter
-            .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-        let end_jump = self.emitter.chunk().code.len() - 1;
-        self.emitter.patch_jump(else_jump);
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
+        let else_jump = self.emitter().chunk().code.len() - 1;
+        self.emitter()
+            .emit_byte(OpCode::Jump { jump: 0xFF }, l);
+        let end_jump = self.emitter().chunk().code.len() - 1;
+        self.emitter().patch_jump(else_jump);
+        self.emitter().emit_byte(OpCode::Pop, l);
         self.parse_precedence(Precedence::Or);
-        self.emitter.patch_jump(end_jump);
+        self.emitter().patch_jump(end_jump);
     }
 
     fn string(&mut self, _can_assign: bool) {
-        let value = Value::Object(ObjType::String(self.previous.text.clone()));
-        self.emitter.emit_constant(value, self.previous.line);
+        let l = self.previous.line;
+        let value = Value::Object(ObjType::String(self.previous.text[1..self.previous.text.len()-1].to_string()));
+        self.emitter().emit_constant(value, l);
     }
 
     fn named_variable(&mut self, name: &Token, can_assign: bool) {
-        let result = self.scope.resolve_local(name);
+        let cons_get: fn (usize) -> OpCode;
+        let cons_set: fn (usize) -> OpCode;
+
+        let arg;
+        match self.scope().resolve_local(name) {
+            Err(msg) => {
+                self.error(msg);
+                return;
+            }
+            Ok(Some(arg_)) => {
+                arg = arg_;
+                cons_get = |index| OpCode::GetLocal { index };
+                cons_set = |index| OpCode::SetLocal { index };
+            }
+            Ok(None) => {
+                match self.scope.resolve_upvalue(name) {
+                    Err(msg) => {
+                        self.error(msg);
+                        return;
+                    }
+                    Ok(Some(arg_)) => {
+                        println!("SOME ARG GET/SET UP {}", arg_);
+                        arg = arg_;
+                        cons_get = |index| OpCode::GetUpvalue { index };
+                        cons_set = |index| OpCode::SetUpvalue { index };
+                    }
+                    Ok(None) => {
+                        arg = self.identifier_constant(name);
+                        cons_get = |index| OpCode::GetGlobal { index };
+                        cons_set = |index| OpCode::SetGlobal { index };
+                    }
+                }
+            }
+        }
+
+
         if can_assign && self.matches(TokenType::Equal) {
             self.expression();
-            match result {
-                Ok(optindex) => {
-                    let op = match optindex {
-                        Some(index) => OpCode::SetLocal { index },
-                        None => OpCode::SetGlobal {
-                            index: self.identifier_constant(name),
-                        },
-                    };
-                    self.emitter.emit_byte(op, self.current.line);
-                }
-                Err(msg) => self.error(msg),
-            }
+            let l = self.current.line;
+            self.emitter().emit_byte(cons_set(arg), l)
         } else {
-            match result {
-                Ok(optindex) => {
-                    let op = match optindex {
-                        Some(index) => OpCode::GetLocal { index },
-                        None => OpCode::GetGlobal {
-                            index: self.identifier_constant(name),
-                        },
-                    };
-                    self.emitter.emit_byte(op, self.current.line);
-                }
-                Err(msg) => self.error(msg),
-            }
+            let l = self.current.line;
+            self.emitter().emit_byte(cons_get(arg), l)
         }
     }
 
@@ -424,9 +549,10 @@ impl Parser {
         self.parse_precedence(Precedence::Unary);
 
         // Emit the operator instruction.
+        let l = self.current.line;
         match tok.tpe {
-            TokenType::Bang => self.emitter.emit_byte(OpCode::Not, self.previous.line),
-            TokenType::Minus => self.emitter.emit_byte(OpCode::Negate, self.previous.line),
+            TokenType::Bang => self.emitter().emit_byte(OpCode::Not, l),
+            TokenType::Minus => self.emitter().emit_byte(OpCode::Negate, l),
             _ => {} // Unreachable.
         }
     }
@@ -450,18 +576,18 @@ impl Parser {
     }
 
     fn identifier_constant(&mut self, name: &Token) -> usize {
-        self.emitter
+        self.emitter()
             .write_constant(Value::Object(ObjType::String(name.text.clone())))
     }
 
     fn declare_variable(&mut self) {
-        if self.scope.depth == 0 {
+        if self.scope().depth() == 0 {
             return;
         }
         let name = self.previous.clone();
-        let iter = &self.scope.locals.clone();
+        let iter = &self.scope().locals().clone();
         for local in iter.iter().rev() {
-            if local.depth != -1 && local.depth < self.scope.depth {
+            if local.depth != -1 && local.depth < self.scope().depth() {
                 break;
             }
             if name.text == local.name.text {
@@ -469,14 +595,14 @@ impl Parser {
             }
         }
 
-        self.scope.add_local(name);
+        self.scope().add_local(name);
     }
 
     fn parse_variable(&mut self, err: &str) -> usize {
         self.consume(TokenType::Identifier, err);
 
         self.declare_variable();
-        if self.scope.depth > 0 {
+        if self.scope().depth() > 0 {
             return 0;
         }
 
@@ -484,13 +610,14 @@ impl Parser {
     }
 
     fn define_variable(&mut self, index: usize) {
-        if self.scope.depth > 0 {
-            self.scope.mark_initialized();
+        if self.scope().depth() > 0 {
+            self.scope().mark_initialized();
             return;
         }
 
-        self.emitter
-            .emit_byte(OpCode::DefineGlobal { index }, self.current.line);
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::DefineGlobal { index }, l);
     }
 
     fn argument_list(&mut self) -> u32 {
@@ -507,12 +634,13 @@ impl Parser {
     }
 
     fn and_(&mut self, _can_assign: bool) {
-        self.emitter
-            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let end_jump = self.emitter.chunk().code.len() - 1;
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
+        let end_jump = self.emitter().chunk().code.len() - 1;
+        self.emitter().emit_byte(OpCode::Pop, l);
         self.parse_precedence(Precedence::And);
-        self.emitter.patch_jump(end_jump);
+        self.emitter().patch_jump(end_jump);
     }
 
     pub fn expression(&mut self) {
@@ -528,22 +656,19 @@ impl Parser {
     }
 
     fn function(&mut self, ftype: FunctionType) {
-        let mut emitter = BytecodeEmitter::new();
-        emitter.function.tpe = ftype;
-        let scope = Scope::new();
-        let old_emitter = self.emitter.clone();
-        let old_scope = self.scope.clone();
-        self.emitter = emitter;
-        self.scope = scope;
+        let mut scope = ScopeCell::new();
+        if ftype != FunctionType::Script {
+            scope.emitter.function.name = Some(self.previous.text.clone());
+        }
+        scope.emitter.function.tpe = ftype;
+        self.scope.stack.push(scope);
 
-        self.scope.begin(); 
-        
+        self.scope().begin(); 
         self.consume(TokenType::LeftParen, "Expect '(' after function name.");
-
 
         if !self.check(TokenType::RightParen) {
             loop {
-                self.emitter.function.arity += 1;
+                self.emitter().function.arity += 1;
                 // if arity>N error
                 let constant = self.parse_variable("Expect parameter name.");
                 self.define_variable(constant);
@@ -557,20 +682,21 @@ impl Parser {
 
         self.end(self.current.line);
 
-        let emitter = self.emitter.clone();
-        self.emitter = old_emitter;
-        self.scope = old_scope;
+        let scope = self.scope.stack.pop().unwrap();
 
-        let function = emitter.function;
+        let function = scope.emitter.function;
         let ftype = ObjType::Function(function);
         let value = Value::Object(ftype);
-        self.emitter.emit_constant(value, self.current.line);
+        let line = self.current.line;
+        let index = self.emitter().write_constant(value);
+
+        self.emitter().emit_byte(OpCode::Closure{ index, upvalues: scope.upvalues }, line);
 
     }
 
     fn fun_declaration(&mut self) {
         let global = self.parse_variable("Expect function name.");
-        self.scope.mark_initialized();
+        self.scope().mark_initialized();
         self.function(FunctionType::Function);
         self.define_variable(global);
     }
@@ -581,7 +707,8 @@ impl Parser {
         if self.matches(TokenType::Equal) {
             self.expression();
         } else {
-            self.emitter.emit_byte(OpCode::Nil, self.current.line);
+            let l = self.current.line;
+            self.emitter().emit_byte(OpCode::Nil, l);
         }
         self.consume(
             TokenType::Semicolon,
@@ -594,11 +721,12 @@ impl Parser {
     fn expression_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after expression.");
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        let l = self.current.line;
+        self.emitter().emit_byte(OpCode::Pop, l);
     }
 
     fn for_statement(&mut self) {
-        self.scope.begin();
+        self.scope().begin();
 
         self.consume(TokenType::LeftParen, "Expect '(' after 'for'.");
         if self.matches(TokenType::Semicolon) {
@@ -609,7 +737,7 @@ impl Parser {
             self.expression_statement();
         }
 
-        let mut loop_start = self.emitter.chunk().code.len();
+        let mut loop_start = self.emitter().chunk().code.len();
 
         let mut exit_jump = None;
 
@@ -618,44 +746,49 @@ impl Parser {
             self.consume(TokenType::Semicolon, "Expect ';' after loop condition.");
 
             // Jump out of the loop if the condition is false.
-            self.emitter
-                .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-            exit_jump = Some(self.emitter.chunk().code.len() - 1);
+            let l = self.current.line;
+            self.emitter()
+                .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
+            exit_jump = Some(self.emitter().chunk().code.len() - 1);
 
-            self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
+            let l = self.current.line;
+            self.emitter().emit_byte(OpCode::Pop, l); // Condition.
         }
 
         if !self.matches(TokenType::RightParen) {
-            self.emitter
-                .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-            let body_jump = self.emitter.chunk().code.len() - 1;
+            let l = self.current.line;
+            self.emitter()
+                .emit_byte(OpCode::Jump { jump: 0xFF }, l);
+            let body_jump = self.emitter().chunk().code.len() - 1;
 
-            let increment_start = self.emitter.chunk().code.len() - 1;
+            let increment_start = self.emitter().chunk().code.len() - 1;
             self.expression();
             self.consume(TokenType::RightParen, "Expect ')' after for clauses.");
 
-            let jump = self.emitter.chunk().code.len() - loop_start;
-            self.emitter
-                .emit_byte(OpCode::Loop { jump }, self.current.line);
+            let l = self.current.line;
+            let jump = self.emitter().chunk().code.len() - loop_start;
+            self.emitter()
+                .emit_byte(OpCode::Loop { jump }, l);
 
             loop_start = increment_start;
 
-            self.emitter.patch_jump(body_jump);
+            self.emitter().patch_jump(body_jump);
         }
 
         self.statement();
-        let jump = self.emitter.chunk().code.len() - loop_start;
-        self.emitter
-            .emit_byte(OpCode::Loop { jump }, self.current.line);
+        let jump = self.emitter().chunk().code.len() - loop_start;
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::Loop { jump }, l);
 
         if let Some(jump) = exit_jump {
-            self.emitter.patch_jump(jump);
-            self.emitter.emit_byte(OpCode::Pop, self.current.line); // Condition.
+            let l = self.current.line;        
+            self.emitter().patch_jump(jump);
+            self.emitter().emit_byte(OpCode::Pop, l); // Condition.
         }
 
-        for _ in 0..self.scope.end() {
-            self.emitter.emit_byte(OpCode::Pop, self.current.line);
-        }
+        let l = self.current.line;
+        self.scope().end(l); 
     }
 
     fn if_statement(&mut self) {
@@ -663,64 +796,73 @@ impl Parser {
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
-        self.emitter
-            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let then_jump = self.emitter.chunk().code.len() - 1;
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
+        let then_jump = self.emitter().chunk().code.len() - 1;
+        self.emitter().emit_byte(OpCode::Pop, l);
         self.statement();
 
-        self.emitter
-            .emit_byte(OpCode::Jump { jump: 0xFF }, self.current.line);
-        let else_jump = self.emitter.chunk().code.len() - 1;
+        let l = self.current.line;
+        self.emitter()
+            .emit_byte(OpCode::Jump { jump: 0xFF }, l);
+        let else_jump = self.emitter().chunk().code.len() - 1;
 
-        self.emitter.patch_jump(then_jump);
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        self.emitter().patch_jump(then_jump);
+        self.emitter().emit_byte(OpCode::Pop, l);
 
         if self.matches(TokenType::Else) {
             self.statement();
         }
 
-        self.emitter.patch_jump(else_jump)
+        self.emitter().patch_jump(else_jump)
     }
 
     fn print_statement(&mut self) {
         self.expression();
         self.consume(TokenType::Semicolon, "Expect ';' after value.");
-        self.emitter.emit_byte(OpCode::Print, self.current.line);
+        let l = self.current.line;
+        self.emitter().emit_byte(OpCode::Print, l);
     }
 
     fn return_statement(&mut self) {
-        if self.emitter.function.tpe == FunctionType::Script {
+        if self.emitter().function.tpe == FunctionType::Script {
             self.error("Can't return from top-level code.");
         }
         if self.matches(TokenType::Semicolon) {
-            self.emitter.emit_return(self.current.line);
+            let l = self.current.line;
+            self.emitter().emit_return(l);
         } else {
             self.expression();
             self.consume(TokenType::Semicolon, "Expect ';' after return value.");
-            self.emitter.emit_byte(OpCode::Return, self.current.line);
+            let l = self.current.line;
+            self.emitter().emit_byte(OpCode::Return, l);
         }
     }
 
     fn while_statement(&mut self) {
-        let loop_start = self.emitter.chunk().code.len() - 1;
+        let loop_start = self.emitter().chunk().code.len() - 1;
         self.consume(TokenType::LeftParen, "Expect '(' after 'while'.");
         self.expression();
         self.consume(TokenType::RightParen, "Expect ')' after condition.");
 
-        self.emitter
-            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, self.current.line);
-        let exit_jump = self.emitter.chunk().code.len() - 1;
+        let l = self.current.line;        
+        self.emitter()
+            .emit_byte(OpCode::JumpIfFalse { jump: 0xFF }, l);
+        let exit_jump = self.emitter().chunk().code.len() - 1;
 
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        let l = self.current.line;
+        self.emitter().emit_byte(OpCode::Pop, l);
+        
+        let l = self.current.line;
         self.statement();
 
-        let jump = self.emitter.chunk().code.len() - loop_start;
-        self.emitter
-            .emit_byte(OpCode::Loop { jump }, self.current.line);
+        let jump = self.emitter().chunk().code.len() - loop_start;
+        self.emitter()
+            .emit_byte(OpCode::Loop { jump }, l);
 
-        self.emitter.patch_jump(exit_jump);
-        self.emitter.emit_byte(OpCode::Pop, self.current.line);
+        self.emitter().patch_jump(exit_jump);
+        self.emitter().emit_byte(OpCode::Pop, l);
     }
 
     fn synchronize(&mut self) {
@@ -774,21 +916,21 @@ impl Parser {
         } else if self.matches(TokenType::While) {
             self.while_statement();
         } else if self.matches(TokenType::LeftBrace) {
-            self.scope.begin();
+            self.scope().begin();
             self.block();
-            for _ in 0..self.scope.end() {
-                self.emitter.emit_byte(OpCode::Pop, self.current.line);
-            }
+            let l = self.current.line;
+            self.scope().end(l);
         } else {
             self.expression_statement();
         }
     }
 
     pub fn end(&mut self, line: usize) {
-        self.emitter.emit_return(line);
+        self.emitter().emit_return(line);
         // debug statements
         if !self.had_error {
-            self.emitter.chunk().disassemble("code");
+            let s = self.emitter().function.name.clone().or(Some("<script>".to_string()));
+            self.emitter().chunk().disassemble(&s.unwrap());
         }
     }
 
@@ -805,31 +947,32 @@ impl Parser {
 
         // Emit the operator instruction.
         match tok.tpe {
-            TokenType::BangEqual => self.emitter.emit_bytes(OpCode::Equal, OpCode::Not, line),
-            TokenType::EqualEqual => self.emitter.emit_byte(OpCode::Equal, line),
-            TokenType::Greater => self.emitter.emit_byte(OpCode::Greater, line),
-            TokenType::GreaterEqual => self.emitter.emit_bytes(OpCode::Less, OpCode::Not, line),
-            TokenType::Less => self.emitter.emit_byte(OpCode::Less, line),
-            TokenType::LessEqual => self.emitter.emit_bytes(OpCode::Greater, OpCode::Not, line),
-            TokenType::Plus => self.emitter.emit_byte(OpCode::Add, line),
-            TokenType::Minus => self.emitter.emit_byte(OpCode::Subtract, line),
-            TokenType::Star => self.emitter.emit_byte(OpCode::Multiply, line),
-            TokenType::Slash => self.emitter.emit_byte(OpCode::Divide, line),
+            TokenType::BangEqual => self.emitter().emit_bytes(OpCode::Equal, OpCode::Not, line),
+            TokenType::EqualEqual => self.emitter().emit_byte(OpCode::Equal, line),
+            TokenType::Greater => self.emitter().emit_byte(OpCode::Greater, line),
+            TokenType::GreaterEqual => self.emitter().emit_bytes(OpCode::Less, OpCode::Not, line),
+            TokenType::Less => self.emitter().emit_byte(OpCode::Less, line),
+            TokenType::LessEqual => self.emitter().emit_bytes(OpCode::Greater, OpCode::Not, line),
+            TokenType::Plus => self.emitter().emit_byte(OpCode::Add, line),
+            TokenType::Minus => self.emitter().emit_byte(OpCode::Subtract, line),
+            TokenType::Star => self.emitter().emit_byte(OpCode::Multiply, line),
+            TokenType::Slash => self.emitter().emit_byte(OpCode::Divide, line),
             _ => {} // Unreachable.
         }
     }
 
     pub fn call(&mut self, _can_assign: bool) {
         let argc = self.argument_list();
-        self.emitter.emit_byte(OpCode::Call{ argc }, self.current.line);
+        let l = self.current.line;
+        self.emitter().emit_byte(OpCode::Call{ argc }, l);
     }      
 
     pub fn literal(&mut self, _can_assign: bool) {
         let tok = self.previous.clone();
         match tok.tpe {
-            TokenType::False => self.emitter.emit_byte(OpCode::False, tok.line),
-            TokenType::Nil => self.emitter.emit_byte(OpCode::Nil, tok.line),
-            TokenType::True => self.emitter.emit_byte(OpCode::True, tok.line),
+            TokenType::False => self.emitter().emit_byte(OpCode::False, tok.line),
+            TokenType::Nil => self.emitter().emit_byte(OpCode::Nil, tok.line),
+            TokenType::True => self.emitter().emit_byte(OpCode::True, tok.line),
             _ => {} // Unreachable.
         }
     }

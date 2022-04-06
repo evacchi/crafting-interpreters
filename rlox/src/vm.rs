@@ -2,23 +2,27 @@ use chunk::Chunk;
 use chunk::OpCode;
 use compiler::Parser;
 use compiler::Compiler;
+use compiler::Upvalue::{Local, Nonlocal};
 use memory::Memory;
 use object::Function;
 use object::ObjType;
 use object::Native;
+use object::Closure;
+use object::Upvalue;
 use value::Value;
+use value::Value::Object;
 
 #[derive(Clone)]
 pub struct CallFrame {
-    function: Function, // ptr would be better, but let's use a clone for now
+    closure: Closure, // ptr would be better, but let's use a clone for now
     ip: usize,
     slot: usize
 }
 
 impl CallFrame {
-    fn new(function: Function, slot: usize) -> CallFrame {
+    fn new(closure: Closure, slot: usize) -> CallFrame {
         CallFrame {
-            function,
+            closure,
             ip: 0,
             slot
         }
@@ -28,6 +32,7 @@ impl CallFrame {
 pub struct VM {
     frames: Vec<CallFrame>,
     stack: Vec<Value>,
+    open_upvalues: Vec<Upvalue>,
     memory: Memory,
 }
 
@@ -42,6 +47,7 @@ impl VM {
         VM {
             frames: Vec::new(),
             stack: Vec::new(),
+            open_upvalues: Vec::new(),
             memory: Memory::new(),
         }
     }
@@ -56,12 +62,14 @@ impl VM {
         let parser = &mut Parser::new(source.to_string());
         let mut compiler = Compiler::new(parser);
         if let Some(function) = compiler.compile() {
-            let frame = CallFrame::new(function.clone(), 0);
+            self.stack.push(Value::Object(ObjType::Function(function.clone())));
+            let frame = CallFrame::new(Closure::new(function.clone()), 0);
             let emitter = compiler.state();
             self.memory = emitter.memory;
             // FIXME ensure native functions are defined because memory is being overwrittend
             self.define_native(Native::named("clock".to_string(), 0, VM::native_clock));
             self.frames.push(frame);
+            
             self.run()
         } else {
             return InterpretResult::CompileError;
@@ -101,7 +109,7 @@ impl VM {
     fn run(&mut self) -> InterpretResult {
         loop {
             let frame = self.frames.last_mut().unwrap();
-            let instruction = frame.function.chunk.fetch(frame.ip);
+            let instruction = frame.closure.function.chunk.fetch(frame.ip);
 
             print!("          ");
             for slot in self.stack.iter() {
@@ -111,13 +119,13 @@ impl VM {
             }
             println!();
 
-            frame.function.chunk.disassemble_instruction(frame.ip);
+            frame.closure.function.chunk.disassemble_instruction(frame.ip);
 
             frame.ip += 1;
 
             match instruction {
                 OpCode::Constant { index } => {
-                    let value = frame.function.chunk.read_constant(index);
+                    let value = frame.closure.function.chunk.read_constant(index);
                     self.stack.push(value);
                 }
                 OpCode::Nil => self.stack.push(Value::Nil),
@@ -127,13 +135,14 @@ impl VM {
                     self.stack.pop();
                 }
                 OpCode::GetLocal { index } => {
-                    self.stack.push(self.stack[frame.slot + index-1].clone());
+                    // self.stack.iter().for_each(|e| println!("STACK: {:?}", e));
+                    self.stack.push(self.stack[frame.slot + index].clone());
                 }
                 OpCode::SetLocal { index } => {
                     self.stack[frame.slot + index-1] = self.stack.last().unwrap().clone()
                 }
                 OpCode::GetGlobal { index } => {
-                    let value = frame.function.chunk.read_constant(index);
+                    let value = frame.closure.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         let k = s.to_string();
@@ -148,7 +157,7 @@ impl VM {
                     }
                 }
                 OpCode::DefineGlobal { index } => {
-                    let value = frame.function.chunk.read_constant(index);
+                    let value = frame.closure.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         self.memory
@@ -157,7 +166,7 @@ impl VM {
                     }
                 }
                 OpCode::SetGlobal { index } => {
-                    let value = frame.function.chunk.read_constant(index);
+                    let value = frame.closure.function.chunk.read_constant(index);
 
                     if let Value::Object(ObjType::String(s)) = value {
                         if self
@@ -168,6 +177,21 @@ impl VM {
                             self.runtime_error(&format!("Undefined variable '{}'.", s));
                             return InterpretResult::RuntimeError;
                         }
+                    }
+                }
+                OpCode::GetUpvalue { index } => {
+                    if frame.closure.upvalues.len() <= index {
+                        panic!("BAD INDEX {} < {}", frame.closure.upvalues.len(), index);
+                    }
+                    let up = frame.closure.upvalues[index].clone();
+                    self.stack.push(Object(ObjType::Upvalue(up)));
+                }
+                OpCode::SetUpvalue { index } => {
+                    if let Some(value) = self.stack.last_mut() {
+                        let v = &mut frame.closure.upvalues[index].value.as_mut();
+                        *v = value;
+                    } else {
+                        panic!("Error SetUpValue: Cannot find value at index {}", index);
                     }
                 }
                 OpCode::Equal => {
@@ -241,7 +265,7 @@ impl VM {
                     match callee {
                         Value::Object(ObjType::Function(f)) => 
                             if argc == f.arity {
-                                self.frames.push(CallFrame::new(f.clone(), up));                          
+                                self.frames.push(CallFrame::new(Closure::new(f.clone()), up));                          
                             } else {
                                 self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                             }
@@ -252,15 +276,71 @@ impl VM {
                             } else {
                                 self.runtime_error(& format!("Expected {} arguments but got {}.", f.arity, argc));
                             }
-                        _ => {
+                        Value::Object(ObjType::Closure(cl)) =>
+                            if argc == cl.function.arity {
+                                self.frames.push(CallFrame::new(cl, up));
+                            } else {
+                                self.runtime_error(& format!("Expected {} arguments but got {}.", cl.function.arity, argc));
+                            }
+                        w => {
+                            println!("GOT {:?}", w);
+
                             self.runtime_error("Can only call functions and classes");
                             return InterpretResult::RuntimeError;
                         }
                     }
                 }
+                OpCode::Closure { index, upvalues } => {
+                    let fc = frame.closure.function.chunk.read_constant(index);
+                    if let Value::Object(ObjType::Function(function)) = fc {
+                        let s = &self.stack;
+                        let mut us= Vec::new();
+                        for u in upvalues.iter() {
+                            let r = match u {
+                                Local(index) => {
+                                    let v = s[frame.slot + index].clone();
+                                    Upvalue::capture(v)
+                                    // Upvalue::capture(s[frame.slot + index].clone()),
+                                }
+                                Nonlocal(index) => {
+                                    frame.closure.upvalues[*index].clone()
+                                }
+                            };
+                            us.push(r);
+                        }
+
+                        for u in us.iter() {
+                            self.capture_upvalue(u.clone());
+                        }
+
+
+                        let closure = Closure {
+                            function,
+                            upvalues: us
+                        };
+
+                        self.stack.push(Value::Object(ObjType::Closure(closure)));
+                    } else {
+                        panic!("I was expecting a function.");
+                    }
+                }
+                OpCode::CloseUpvalue => {
+                    //         closeUpvalues(vm.stackTop - 1);
+                    //        pop();
+                    self.close_upvalues(self.stack.len());
+                    self.stack.pop();
+                }
                 OpCode::Return => {
                     if let Some(result) = self.stack.pop() {
+
+                        // closeUpvalues(frame->slots)
+                        let slot = frame.slot;
+                        self.close_upvalues(slot);
                         self.frames.pop();
+                        for i in slot..self.stack.len() {
+                            // println!("{}/{}", i, slot);
+                            self.stack.pop();
+                        }
                         if self.frames.len() == 0 {
                             self.stack.pop();
                             // Exit interpreter.
@@ -270,6 +350,30 @@ impl VM {
                     }
                 }
             }
+        }
+    }
+
+    fn capture_upvalue(&mut self, value: Upvalue) -> Upvalue {
+        for i in self.open_upvalues.iter() {
+            if i.value == value.value {
+                return i.clone();
+            }
+        }
+
+        self.open_upvalues.push(value.clone());
+        value
+    }
+
+    fn close_upvalues(&mut self, index: usize) {
+        let mut iter = self.open_upvalues.len();
+        loop {
+            if iter == 0 /*|| self.open_upvalues.last().unwrap().index < index */{
+                break;
+            } 
+
+            // self.open_upvalues.pop();
+            
+            iter -= 1;
         }
     }
 
